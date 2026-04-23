@@ -3,113 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lemon Live Turbo</title>
+    <title>Camera Live DKV</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        #v-main { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        .overlay { position: absolute; top: 0; left: 0; right: 0; padding: 15px; background: rgba(0,0,0,0.7); text-align: center; z-index: 10; }
-        .btn-wa { background: #25d366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; width: 100%; max-width: 250px; }
-        #menu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; z-index: 20; position: relative; background: #111; }
-        .btn-mode { width: 280px; padding: 20px; border-radius: 15px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; }
+        body, html { width: 100%; height: 100%; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+        
+        /* Video Setup */
+        #v-main { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; }
+
+        /* UI Overlay */
+        .overlay { position: absolute; top: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); text-align: center; z-index: 10; }
+        .status-pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; border: 1px solid #444; }
+        .id-text { font-size: 32px; color: #00ff00; font-weight: bold; font-family: monospace; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
+
+        /* Menu Utama */
+        #menu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 25px; z-index: 20; position: relative; background: #0a0a0a; padding: 30px; }
+        h1 { font-size: 24px; letter-spacing: 3px; color: #fff; margin-bottom: 10px; }
+        .btn-mode { width: 100%; max-width: 320px; padding: 22px; border-radius: 16px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        .btn-kam { background: #fff; color: #000; }
+        .btn-op { background: transparent; color: #fff; border: 2px solid #333; }
+        .btn-mode:active { transform: scale(0.96); opacity: 0.8; }
+
+        /* Tombol Copy */
+        .copy-box { margin-top: 15px; }
+        .btn-copy { background: #222; color: #fff; border: 1px solid #444; padding: 12px 25px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
+        .btn-copy:hover { background: #333; }
     </style>
 </head>
 <body>
 
     <div id="menu">
-        <button class="btn-mode" style="background:#28a745; color:white;" onclick="pilih('kameramen')">MULAI KAMERAMEN</button>
-        <button class="btn-mode" style="background:#007bff; color:white;" onclick="pilih('operator')">MODE OPERATOR (MANUAL)</button>
+        <h1>CAMERA LIVE DKV</h1>
+        <button class="btn-mode btn-kam" onclick="startMode('kam')">SAYA KAMERAMEN</button>
+        <button class="btn-mode btn-op" onclick="startMode('op')">MODE OPERATOR VMIX</button>
+        <p style="font-size: 10px; color: #555;">v2.0 Low Latency Mode</p>
     </div>
 
     <div id="app" style="display:none;">
         <div class="overlay">
-            <div id="stat" style="font-size:12px; color:#aaa;">Inisialisasi...</div>
-            <div id="id-box" style="font-size:24px; color:#0f0; font-weight:bold; margin:5px 0;">----</div>
-            <button id="wa-btn" class="btn-wa" style="display:none;" onclick="shareWA()">KIRIM LINK KE VMIX</button>
+            <div id="stat" class="status-pill">Inisialisasi...</div>
+            <div id="id-box" class="id-text">----</div>
+            <div id="kam-tools" class="copy-box" style="display:none;">
+                <button class="btn-copy" onclick="copyLink()">SALIN LINK LIVE</button>
+            </div>
         </div>
         <video id="v-main" autoplay playsinline muted></video>
     </div>
 
     <script>
-        const video = document.getElementById('v-main');
+        const v = document.getElementById('v-main');
         const stat = document.getElementById('stat');
         const idBox = document.getElementById('id-box');
         let stream, peer;
 
-        // Cek URL Otomatis
-        const urlParams = new URLSearchParams(window.location.search);
-        const autoId = urlParams.get('id');
-        if (autoId) pilih('operator', autoId);
+        // Auto-Check URL
+        const params = new URLSearchParams(window.location.search);
+        const autoId = params.get('id');
+        if (autoId) startMode('op', autoId);
 
-        function pilih(mode, aid = null) {
+        function startMode(mode, aid = null) {
             document.getElementById('menu').style.display = 'none';
             document.getElementById('app').style.display = 'block';
-            if (mode === 'kameramen') {
-                document.getElementById('wa-btn').style.display = 'inline-block';
-                startCam().then(() => initPeer(true));
+            
+            if (mode === 'kam') {
+                document.getElementById('kam-tools').style.display = 'block';
+                setupCamera().then(() => initPeer(true));
             } else {
                 initPeer(false, aid);
             }
         }
 
-        async function startCam() {
+        async function setupCamera() {
             try {
+                // Konfigurasi Ultra-Low Latency (SD Optimized)
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: 640, height: 480 },
-                    audio: true
+                    video: { 
+                        facingMode: "environment", 
+                        width: { ideal: 640 }, 
+                        height: { ideal: 480 },
+                        frameRate: { max: 24 } // Frame rate konsisten mengurangi jitter
+                    },
+                    audio: { echoCancellation: true, noiseSuppression: true }
                 });
-                video.srcObject = stream;
-            } catch (e) { alert("Izinkan Kamera!"); }
+                v.srcObject = stream;
+            } catch (e) { alert("Akses Kamera Ditolak!"); }
         }
 
         function initPeer(isKam, aid = null) {
-            peer = new Peer({ config: {'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] }});
+            // Gunakan STUN server global agar jabat tangan lebih cepat
+            peer = new Peer({
+                config: {'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]}
+            });
             
             peer.on('open', (id) => {
                 if(isKam) {
                     idBox.innerText = id;
-                    stat.innerText = "SIAP KIRIM";
+                    stat.innerText = "Kamera Siap";
                 } else if(aid) {
-                    tryConnect(aid);
+                    connectTo(aid);
                 }
             });
 
             if(isKam) {
                 peer.on('call', (call) => {
+                    // Paksa koneksi langsung tanpa negosiasi lama
                     call.answer(stream);
-                    stat.innerText = "LIVE TERHUBUNG!";
-                    idBox.innerText = "STREAMING...";
+                    stat.innerText = "LIVE TERHUBUNG";
+                    stat.style.borderColor = "#00ff00";
+                    stat.style.color = "#00ff00";
                 });
             }
         }
 
-        function tryConnect(tid) {
-            stat.innerText = "Mencoba Menghubungkan...";
+        function connectTo(tid) {
+            stat.innerText = "Connecting...";
+            // Setting metadata agar stream dianggap prioritas
             const call = peer.call(tid, null);
             
-            // Timeout jika 5 detik tidak respon, coba lagi
-            const timer = setTimeout(() => {
-                if (stat.innerText !== "LIVE DARI HP") {
-                    console.log("Retry...");
-                    tryConnect(tid);
-                }
-            }, 3000);
+            let retry = setTimeout(() => {
+                if (stat.innerText !== "LIVE") connectTo(tid);
+            }, 3500);
 
             call.on('stream', (rem) => {
-                clearTimeout(timer);
-                video.srcObject = rem;
-                video.muted = false;
-                stat.innerText = "LIVE DARI HP";
-                idBox.innerText = "CONNECTED";
+                clearTimeout(retry);
+                v.srcObject = rem;
+                v.muted = false; // Aktifkan suara di sisi vMix
+                stat.innerText = "LIVE";
+                stat.style.borderColor = "#00ff00";
+                idBox.innerText = "VMIX CONNECTED";
             });
-
-            call.on('error', () => { tryConnect(tid); });
         }
 
-        function shareWA() {
+        function copyLink() {
             const link = window.location.href.split('?')[0] + "?id=" + idBox.innerText;
-            window.open(`https://wa.me/?text=${encodeURIComponent("LIVE VMIX: "+link)}`, '_blank');
+            navigator.clipboard.writeText(link).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                btn.innerText = "LINK DISALIN!";
+                btn.style.background = "#00ff00";
+                btn.style.color = "#000";
+                setTimeout(() => {
+                    btn.innerText = "SALIN LINK LIVE";
+                    btn.style.background = "#222";
+                    btn.style.color = "#fff";
+                }, 2000);
+            });
         }
     </script>
 </body>
