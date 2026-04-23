@@ -2,137 +2,160 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DKV Muhlibat - Internet Cam</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DKV MUHLIBAT - Broadcast Pro</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; text-align: center; padding: 20px; }
-        .box { max-width: 400px; margin: auto; background: #222; padding: 20px; border-radius: 15px; border: 1px solid #333; }
-        video { width: 100%; border-radius: 10px; margin-top: 10px; background: #000; }
-        .id-text { font-size: 3rem; color: #2ecc71; font-weight: bold; margin: 10px 0; }
-        .btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-red { background: #e74c3c; color: white; }
-        .btn-blue { background: #3498db; color: white; }
-        select, input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
-        #status { font-size: 0.9rem; color: #f1c40f; min-height: 20px; }
+        body { 
+            font-family: sans-serif; background: #000; color: white; 
+            margin: 0; padding: 0; overflow: hidden; 
+            display: flex; justify-content: center; align-items: center; height: 100vh;
+        }
+        .hidden { display: none !important; }
+        
+        /* Video Full Screen & Landscape Force */
+        video { 
+            position: fixed; top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
+            object-fit: cover; background: black; z-index: 1;
+        }
+
+        /* UI Overlay */
+        .ui-panel {
+            position: relative; z-index: 10;
+            background: rgba(30, 30, 30, 0.9);
+            padding: 25px; border-radius: 15px;
+            max-width: 320px; text-align: center;
+            border: 1px solid #444;
+        }
+
+        .id-display { font-size: 50px; font-weight: bold; color: #2ecc71; margin: 10px 0; }
+        .btn { 
+            width: 100%; padding: 15px; margin: 10px 0; border: none; 
+            border-radius: 8px; font-weight: bold; cursor: pointer; 
+        }
+        .btn-cam { background: #e74c3c; color: white; }
+        .btn-op { background: #3498db; color: white; }
+        
+        input, select { 
+            width: 100%; padding: 12px; margin: 10px 0; 
+            border-radius: 5px; border: none; box-sizing: border-box;
+        }
+
+        #status-bar {
+            position: fixed; top: 10px; left: 10px; 
+            z-index: 20; font-size: 12px; color: rgba(255,255,255,0.5);
+        }
     </style>
 </head>
 <body>
 
-<div class="box">
-    <h2>DKV MUHLIBAT v2</h2>
-    <div id="status">Menginisialisasi...</div>
+<div id="status-bar">DKV Muhlibat System</div>
 
-    <div id="menu">
-        <button class="btn btn-red" onclick="initPeer('cam')">MULAI KAMERAMEN</button>
-        <button class="btn btn-blue" onclick="initPeer('op')">MULAI OPERATOR (VMIX)</button>
-    </div>
-
-    <div id="ui-cam" style="display:none">
-        <p>ID KAMERA ANDA:</p>
-        <div id="display-id" class="id-text">----</div>
-        <select id="res" onchange="startStream()">
-            <option value="720">HD 720p (Stabil)</option>
-            <option value="1080">Full HD 1080p (Butuh Sinyal Kuat)</option>
-            <option value="480">SD 480p (Hemat Kuota)</option>
-        </select>
-        <video id="preview" autoplay muted playsinline></video>
-        <p style="font-size: 0.7rem; color: #888;">ID ini akan tetap sama di HP ini meskipun direfresh.</p>
-    </div>
-
-    <div id="ui-op" style="display:none">
-        <input type="text" id="input-id" placeholder="Masukkan 4 Digit Kode" maxlength="4">
-        <button class="btn btn-blue" onclick="connectToCam()">HUBUNGKAN SEKARANG</button>
-        <video id="remote-view" autoplay playsinline></video>
-    </div>
+<div id="menu" class="ui-panel">
+    <h3>WIRELESS CAM</h3>
+    <button class="btn btn-cam" onclick="startRole('cam')">KAMERAMEN (HP)</button>
+    <button class="btn btn-op" onclick="startRole('op')">OPERATOR (VMIX)</button>
 </div>
+
+<div id="ui-cam" class="ui-panel hidden">
+    <p>ID KAMERA ANDA:</p>
+    <div id="display-id" class="id-display">----</div>
+    <select id="res" onchange="setupCamera()">
+        <option value="720">Landscape 720p</option>
+        <option value="1080">Landscape 1080p</option>
+    </select>
+    <p>Posisikan HP Landscape!</p>
+    <button class="btn btn-cam" onclick="toggleUI()">HIDE UI (PREVIEW)</button>
+</div>
+
+<div id="ui-op" class="ui-panel hidden">
+    <h3>VMIX RECEIVER</h3>
+    <input type="text" id="target-id" placeholder="Kode 4 Digit" maxlength="4">
+    <button class="btn btn-op" onclick="connectToCam()">HUBUNGKAN</button>
+</div>
+
+<video id="main-video" autoplay playsinline muted></video>
 
 <script>
     let peer = null;
-    let myStream = null;
-    
-    // Konfigurasi Server Biar Bisa Tembus Internet (STUN Server Google)
-    const peerConfig = {
-        config: {
-            'iceServers': [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ],
-            'sdpSemantics': 'unified-plan'
-        }
-    };
+    let localStream = null;
+    const videoEl = document.getElementById('main-video');
 
     function getPersistentID() {
-        let id = localStorage.getItem('dkv_id');
+        let id = localStorage.getItem('dkv_muhlibat_id');
         if (!id) {
             id = Math.floor(1000 + Math.random() * 9000).toString();
-            localStorage.setItem('dkv_id', id);
+            localStorage.setItem('dkv_muhlibat_id', id);
         }
         return id;
     }
 
-    function initPeer(role) {
-        const id = getPersistentID();
-        document.getElementById('menu').style.display = 'none';
-        
-        if (role === 'cam') {
-            document.getElementById('ui-cam').style.display = 'block';
-            document.getElementById('display-id').innerText = id;
-            peer = new Peer('dkv-muhlibat-' + id, peerConfig);
-            startStream();
-            
-            peer.on('open', () => document.getElementById('status').innerText = "Kamera Siap! Tunggu Operator...");
-            peer.on('call', call => {
-                document.getElementById('status').innerText = "LIVE! Sedang Mengirim Gambar...";
-                call.answer(myStream);
-            });
-        } else {
-            document.getElementById('ui-op').style.display = 'block';
-            peer = new Peer(peerConfig);
-            peer.on('open', () => document.getElementById('status').innerText = "Operator Siap. Masukkan ID Kamera.");
-        }
+    async function startRole(role) {
+        document.getElementById('menu').classList.add('hidden');
+        const iceConfig = { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } };
 
-        peer.on('error', err => {
-            console.error(err);
-            document.getElementById('status').innerText = "Error: " + err.type;
-            if(err.type === 'unavailable-id') alert("ID sedang digunakan, coba lagi nanti.");
-        });
+        if (role === 'cam') {
+            const id = getPersistentID();
+            document.getElementById('ui-cam').classList.remove('hidden');
+            document.getElementById('display-id').innerText = id;
+            
+            peer = new Peer('dkv-' + id, iceConfig);
+            await setupCamera();
+
+            peer.on('call', call => {
+                call.answer(localStream);
+                document.getElementById('status-bar').innerText = "STATUS: LIVE KE VMIX";
+            });
+
+        } else {
+            document.getElementById('ui-op').classList.remove('hidden');
+            peer = new Peer(iceConfig);
+            videoEl.muted = false; // Suara aktif untuk sisi vMix
+        }
     }
 
-    async function startStream() {
+    async function setupCamera() {
         const h = document.getElementById('res').value;
-        const constraints = { 
-            video: { height: parseInt(h), facingMode: "environment" }, 
-            audio: true 
+        const constraints = {
+            // Memaksa aspek rasio 16:9 (Landscape)
+            video: { 
+                height: { ideal: parseInt(h) },
+                aspectRatio: 1.777777778,
+                facingMode: "environment" 
+            },
+            audio: true
         };
-        
-        try {
-            if (myStream) myStream.getTracks().forEach(t => t.stop());
-            myStream = await navigator.mediaDevices.getUserMedia(constraints);
-            document.getElementById('preview').srcObject = myStream;
-        } catch (e) {
-            alert("Akses Kamera Ditolak! Pastikan gunakan HTTPS.");
-        }
+
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoEl.srcObject = localStream;
     }
 
     function connectToCam() {
-        const targetId = document.getElementById('input-id').value;
-        document.getElementById('status').innerText = "Menghubungkan ke " + targetId + "...";
-        
-        const call = peer.call('dkv-muhlibat-' + targetId, new MediaStream());
+        const id = document.getElementById('target-id').value;
+        const call = peer.call('dkv-' + id, new MediaStream());
         
         call.on('stream', remoteStream => {
-            document.getElementById('status').innerText = "Terhubung!";
-            document.getElementById('remote-view').srcObject = remoteStream;
+            videoEl.srcObject = remoteStream;
+            // SEMBUNYIKAN UI SETELAH CONNECT (Agar vMix Bersih)
+            document.getElementById('ui-op').classList.add('hidden');
+            document.getElementById('status-bar').innerText = "READY FOR VMIX";
         });
-
-        setTimeout(() => {
-            if (document.getElementById('status').innerText.includes("Menghubungkan")) {
-                document.getElementById('status').innerText = "Koneksi Lambat... Pastikan HP Kameramen sudah buka web.";
-            }
-        }, 5000);
     }
+
+    // Fungsi klik layar untuk muncul/sembunyikan UI (Khusus Kameramen)
+    function toggleUI() {
+        const ui = document.getElementById('ui-cam');
+        ui.classList.toggle('hidden');
+    }
+
+    // Klik pada video untuk memunculkan kembali UI jika tersembunyi
+    videoEl.onclick = () => {
+        if(document.getElementById('ui-cam').classList.contains('hidden') && !document.getElementById('ui-op').offsetParent) {
+             document.getElementById('ui-cam').classList.remove('hidden');
+        }
+    };
 </script>
 </body>
 </html>
