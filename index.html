@@ -2,205 +2,105 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DKV NINJA - Stream Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DKV LOCAL TEST</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; height: 100vh; }
-        .hidden { display: none !important; }
-        
-        #video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        video { width: 100%; height: 100%; object-fit: cover; background: #000; }
-
-        /* Monitor Info */
-        #floating-info { 
-            position: fixed; top: 15px; left: 15px; z-index: 100; 
-            background: rgba(0,0,0,0.8); padding: 12px; border-radius: 10px; border-left: 5px solid #3498db;
-        }
-        .id-label { font-size: 22px; font-weight: bold; color: #00ff88; }
-        .stat-line { font-size: 11px; font-family: monospace; color: #aaa; margin-top: 5px; }
-
-        /* Audio Monitor */
-        .audio-wrapper { margin-top: 10px; }
-        .audio-text { font-size: 10px; font-weight: bold; color: #00ff88; margin-bottom: 3px; }
-        .audio-bar-bg { width: 120px; height: 5px; background: #333; border-radius: 3px; }
-        #audio-bar-fill { height: 100%; width: 0%; background: #00ff88; transition: 0.1s; }
-
-        /* UI Panels */
-        .panel { 
-            position: relative; z-index: 50; background: #1a1a1a; 
-            padding: 30px; border-radius: 15px; width: 320px; 
-            margin: 100px auto; text-align: center; border: 1px solid #333;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .btn { width: 100%; padding: 14px; margin: 8px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-blue { background: #3498db; color: white; }
-        .btn-red { background: #e74c3c; color: white; }
-        .btn-green { background: #2ecc71; color: white; }
-        .btn-dark { background: #444; color: white; font-size: 12px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; background: #222; color: white; border: 1px solid #444; box-sizing: border-box; }
-
-        /* Floating Controls */
-        #controls { position: fixed; bottom: 25px; right: 25px; z-index: 100; display: flex; flex-direction: column; gap: 12px; width: 150px; }
-        #stream-status { font-weight: bold; color: #e74c3c; font-size: 12px; text-align: center; margin-bottom: 5px; }
+        body { font-family: sans-serif; background: #000; color: #fff; text-align: center; }
+        .container { padding: 20px; max-width: 400px; margin: auto; }
+        video { width: 100%; border-radius: 10px; margin-top: 10px; background: #222; }
+        .btn { width: 100%; padding: 15px; margin: 5px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-cam { background: #e74c3c; color: white; }
+        .btn-op { background: #3498db; color: white; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; text-align: center; box-sizing: border-box; }
+        #log { font-size: 11px; color: #888; text-align: left; background: #111; padding: 10px; height: 100px; overflow-y: scroll; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div id="floating-info" class="hidden">
-    <div class="id-label">CAM ID: <span id="my-id-text">----</span></div>
-    <div class="stat-line" id="stat-speed">SPEED: 0 kbps</div>
-    <div class="audio-wrapper">
-        <div class="audio-text">AUDIO MONITOR</div>
-        <div class="audio-bar-bg"><div id="audio-bar-fill"></div></div>
+<div class="container">
+    <h2>DKV LOCAL TEST</h2>
+    <div id="menu">
+        <button class="btn btn-cam" onclick="init('cam')">KAMERAMEN</button>
+        <button class="btn btn-op" onclick="init('op')">OPERATOR</button>
     </div>
-</div>
 
-<div id="menu" class="panel">
-    <h2 style="color: #3498db;">DKV MUHLIBAT</h2>
-    <button class="btn btn-red" onclick="startApp('cam')">MULAI KAMERAMEN</button>
-    <button class="btn btn-blue" onclick="startApp('op')">MULAI OPERATOR</button>
-</div>
+    <div id="ui-cam" style="display:none">
+        <p>ID ANDA:</p>
+        <h1 id="my-id" style="color: #2ecc71;">----</h1>
+        <button class="btn" style="background:#2ecc71; color:white;" onclick="toggleStream()">START/STOP STREAM</button>
+        <video id="p-v" autoplay muted playsinline></video>
+    </div>
 
-<div id="ui-op" class="panel hidden">
-    <h3>OPERATOR VMIX</h3>
-    <input type="text" id="target-id" placeholder="Masukkan Kode 4 Digit" maxlength="4">
-    <button class="btn btn-blue" id="btn-conn" onclick="connectToCam()">CONNECT TO CAMERA</button>
-</div>
+    <div id="ui-op" style="display:none">
+        <input type="text" id="t-id" placeholder="Masukkan ID">
+        <button class="btn btn-op" onclick="connect()">HUBUNGKAN</button>
+        <video id="r-v" autoplay playsinline></video>
+    </div>
 
-<div id="controls" class="hidden">
-    <div id="stream-status">🔴 OFFLINE</div>
-    <button id="btn-stream" class="btn btn-green" onclick="toggleStream()">START STREAM</button>
-    <button class="btn btn-dark" onclick="flipCamera()">GANTI KAMERA</button>
-    <button class="btn btn-dark" onclick="toggleUIPanel()">HIDE/SHOW INFO</button>
-</div>
-
-<div id="video-container">
-    <video id="v-main" autoplay playsinline muted></video>
+    <div id="log">Sistem Siap...</div>
 </div>
 
 <script>
-    let peer = null, localStream = null, lastBytes = 0, currentFacing = "environment", isStreaming = false;
-    const vMain = document.getElementById('v-main');
-    const iceCfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    let peer = null, localStream = null, isStream = false;
 
-    async function startApp(role) {
-        document.getElementById('menu').classList.add('hidden');
-        document.getElementById('floating-info').classList.remove('hidden');
-
-        if(role === 'cam') {
-            const id = localStorage.getItem('dkv_id') || Math.floor(1000 + Math.random() * 9000).toString();
-            localStorage.setItem('dkv_id', id);
-            document.getElementById('my-id-text').innerText = id;
-            document.getElementById('controls').classList.remove('hidden');
-
-            peer = new Peer('dkv-' + id, { config: iceCfg });
-            await setupCamera();
-
-            // Matikan stream saat awal agar tidak makan data sebelum klik tombol Stream
-            localStream.getTracks().forEach(track => track.enabled = false);
-
-            peer.on('call', call => {
-                call.answer(localStream);
-                startMonitoring(call.peerConnection, localStream);
-            });
-        } else {
-            document.getElementById('ui-op').classList.remove('hidden');
-            vMain.muted = false;
-            peer = new Peer({ config: iceCfg });
-        }
+    function addLog(msg) {
+        const log = document.getElementById('log');
+        log.innerHTML += `> ${msg}<br>`;
+        log.scrollTop = log.scrollHeight;
     }
 
-    async function setupCamera() {
-        if(localStream) localStream.getTracks().forEach(t => t.stop());
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacing, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-                audio: true
+    async function init(role) {
+        document.getElementById('menu').style.display = 'none';
+        // Menggunakan STUN Google saja untuk testing awal
+        const cfg = { config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } };
+
+        if (role === 'cam') {
+            document.getElementById('ui-cam').style.display = 'block';
+            const id = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('my-id').innerText = id;
+            
+            peer = new Peer('dkv-' + id, cfg);
+            localStream = await navigator.mediaDevices.getUserMedia({ video: {facingMode: "environment"}, audio: true });
+            document.getElementById('p-v').srcObject = localStream;
+            localStream.getTracks().forEach(t => t.enabled = false);
+
+            peer.on('open', () => addLog("ID Terdaftar: dkv-" + id));
+            peer.on('call', call => {
+                addLog("Menerima Panggilan...");
+                call.answer(localStream);
+                addLog("Streaming Berjalan.");
             });
-            vMain.srcObject = localStream;
-            startMonitoring(null, localStream);
-        } catch(e) { alert("HTTPS diperlukan!"); }
+        } else {
+            document.getElementById('ui-op').style.display = 'block';
+            peer = new Peer(cfg);
+            peer.on('open', () => addLog("Operator Siap."));
+        }
+
+        peer.on('error', err => addLog("ERROR: " + err.type));
     }
 
     function toggleStream() {
-        isStreaming = !isStreaming;
-        const btn = document.getElementById('btn-stream');
-        const status = document.getElementById('stream-status');
-
-        // Mengaktifkan atau menonaktifkan track video/audio
-        localStream.getTracks().forEach(track => track.enabled = isStreaming);
-
-        if(isStreaming) {
-            btn.innerText = "STOP STREAM";
-            btn.className = "btn btn-red";
-            status.innerText = "🔵 LIVE UPLOADING";
-            status.style.color = "#2ecc71";
-        } else {
-            btn.innerText = "START STREAM";
-            btn.className = "btn btn-green";
-            status.innerText = "🔴 OFFLINE";
-            status.style.color = "#e74c3c";
-        }
+        isStream = !isStream;
+        localStream.getTracks().forEach(t => t.enabled = isStream);
+        addLog(isStream ? "Stream ON" : "Stream OFF");
     }
 
-    function flipCamera() {
-        currentFacing = (currentFacing === "environment") ? "user" : "environment";
-        setupCamera().then(() => {
-            // Tetap pertahankan status stream saat ganti kamera
-            localStream.getTracks().forEach(track => track.enabled = isStreaming);
-        });
-    }
-
-    function connectToCam() {
-        const tid = document.getElementById('target-id').value;
+    function connect() {
+        const tid = document.getElementById('t-id').value;
+        addLog("Menghubungi dkv-" + tid + "...");
         const call = peer.call('dkv-' + tid, new MediaStream());
-        document.getElementById('btn-conn').innerText = "Connecting...";
         
         call.on('stream', stream => {
-            vMain.srcObject = stream;
-            document.getElementById('ui-op').classList.add('hidden');
-            document.getElementById('my-id-text').innerText = tid;
-            startMonitoring(call.peerConnection, stream);
+            addLog("Video Diterima!");
+            document.getElementById('r-v').srcObject = stream;
         });
-    }
 
-    function startMonitoring(pc, stream) {
-        // Audio Bar Logic
-        const ctx = new AudioContext();
-        const src = ctx.createMediaStreamSource(stream);
-        const ana = ctx.createAnalyser();
-        src.connect(ana);
-        const data = new Uint8Array(ana.frequencyBinCount);
-
-        function frame() {
-            ana.getByteFrequencyData(data);
-            let avg = data.reduce((a,b) => a+b) / data.length;
-            document.getElementById('audio-bar-fill').style.width = Math.min(avg * 3, 100) + "%";
-            requestAnimationFrame(frame);
-        }
-        frame();
-
-        // Speed Logic
-        if(pc) {
-            setInterval(async () => {
-                const stats = await pc.getStats();
-                stats.forEach(report => {
-                    if (report.type === 'inbound-rtp' || report.type === 'outbound-rtp') {
-                        if (report.kind === 'video') {
-                            const bytes = report.bytesReceived || report.bytesSent;
-                            const speed = Math.floor((bytes - lastBytes) * 8 / 1000);
-                            if(speed >= 0) document.getElementById('stat-speed').innerText = `SPEED: ${speed} kbps`;
-                            lastBytes = bytes;
-                        }
-                    }
-                });
-            }, 1000);
-        }
-    }
-
-    function toggleUIPanel() {
-        document.getElementById('floating-info').classList.toggle('hidden');
+        setTimeout(() => {
+            if(!document.getElementById('r-v').srcObject) {
+                addLog("Timeout: Coba Refresh & Pastikan Kameramen sudah START STREAM.");
+            }
+        }, 5000);
     }
 </script>
 </body>
