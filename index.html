@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Tes Kamera Photobooth</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #222; color: white; }
+        .wrapper { max-width: 800px; margin: auto; padding: 20px; }
+        
+        /* Video Preview */
+        video { 
+            width: 100%; 
+            max-width: 640px; 
+            border: 5px solid #444; 
+            border-radius: 15px;
+            background: #000;
+        }
+
+        /* Hasil Foto */
+        #photo-result {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 300px;
+            border: 3px solid #007bff;
+            border-radius: 10px;
+            display: none; /* Sembunyi sebelum dijepret */
+        }
+
+        .controls { margin: 20px 0; }
+        select, button { padding: 12px 20px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; }
+        button { background: #28a745; color: white; font-weight: bold; }
+        button:active { transform: scale(0.98); }
+        select { background: #fff; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <h1>📷 Tes Preview Kamera</h1>
+    <p>Pilih kamera (Internal atau DSLR via USB) lalu klik Ambil Foto</p>
+
+    <div class="controls">
+        <select id="videoSource"></select>
+        <button id="capture">AMBIL FOTO</button>
+    </div>
+
+    <video id="video" autoplay playsinline></video>
+
+    <div class="result-area">
+        <h3>Hasil Jepretan:</h3>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <img id="photo-result" alt="Hasil jepretan akan muncul di sini">
+    </div>
+</div>
+
+<script>
+    const video = document.querySelector('video');
+    const canvas = document.querySelector('canvas');
+    const img = document.querySelector('#photo-result');
+    const videoSelect = document.querySelector('#videoSource');
+    const btnCapture = document.querySelector('#capture');
+
+    // 1. Cari semua kamera yang terhubung
+    async function getDevices() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        videoSelect.innerHTML = '';
+        videoDevices.forEach((device, i) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.text = device.label || `Kamera ${i + 1}`;
+            videoSelect.appendChild(option);
+        });
+    }
+
+    // 2. Jalankan kamera berdasarkan pilihan
+    async function startVideo() {
+        if (window.stream) {
+            window.stream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+            video: { deviceId: { exact: videoSelect.value } }
+        };
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            window.stream = stream;
+            video.srcObject = stream;
+        } catch (e) {
+            console.error("Error akses kamera: ", e);
+        }
+    }
+
+    // 3. Logika ambil foto (Capture)
+    btnCapture.onclick = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        
+        // Ubah canvas ke gambar agar bisa dilihat
+        img.src = canvas.toDataURL('image/png');
+        img.style.display = 'inline-block';
+    };
+
+    // Jalankan deteksi saat pertama buka
+    videoSelect.onchange = startVideo;
+    
+    // Minta izin kamera dulu baru deteksi list kamera
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(() => {
+            getDevices().then(startVideo);
+        });
+
+</script>
+
+</body>
+</html>
