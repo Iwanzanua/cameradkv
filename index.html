@@ -3,68 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>vMix Remote Cam Pro</title>
+    <title>vMix Remote Cam - Auto Connect</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100%; height: 100%; background: #111; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* Menu Utama */
         #menu-utama { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; padding: 20px; }
         .btn { width: 100%; max-width: 300px; padding: 18px; font-size: 16px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; transition: 0.2s; }
         .btn-kameramen { background: #28a745; color: white; }
         .btn-operator { background: #007bff; color: white; }
 
-        /* Area Kerja */
         #area-kerja { display: none; position: relative; height: 100vh; width: 100%; background: #000; }
         video { width: 100%; height: 100%; object-fit: cover; }
         
         .overlay-top { position: absolute; top: 0; left: 0; right: 0; padding: 15px; background: rgba(0,0,0,0.85); text-align: center; z-index: 10; border-bottom: 1px solid #333; }
-        .id-display { font-size: 32px; color: #0f0; font-weight: bold; margin: 5px 0; font-family: monospace; }
+        .id-display { font-size: 28px; color: #0f0; font-weight: bold; margin: 5px 0; font-family: monospace; }
         
         .action-box { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
         .btn-small { padding: 10px 15px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; color: white; }
-        .btn-copy { background: #6c757d; }
         .btn-wa { background: #25d366; }
 
-        /* Resolusi Selector */
         #res-selector { background: #444; color: white; border: 1px solid #666; padding: 8px; border-radius: 6px; font-size: 12px; }
-
-        /* Panel Operator */
-        #panel-operator { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; background: rgba(0,0,0,0.9); padding: 20px; border-radius: 15px; border: 1px solid #444; z-index: 20; }
-        input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #555; background: #222; color: white; font-size: 20px; text-align: center; }
     </style>
 </head>
 <body>
 
     <div id="menu-utama">
-        <h2 style="letter-spacing: 2px;">LEMON BOOTH LIVE</h2>
+        <h2 style="letter-spacing: 2px;">LEMON REMOTE LIVE</h2>
         <button class="btn btn-kameramen" onclick="pilihMode('kameramen')">SAYA KAMERAMEN</button>
         <button class="btn btn-operator" onclick="pilihMode('operator')">SAYA OPERATOR VMIX</button>
     </div>
 
     <div id="area-kerja">
         <div class="overlay-top">
-            <div id="status-text" style="font-size: 11px; color: #aaa; text-transform: uppercase;">Menunggu Inisialisasi...</div>
+            <div id="status-text" style="font-size: 11px; color: #aaa;">Inisialisasi...</div>
             <div id="id-box" class="id-display">----</div>
             
             <div id="kameramen-tools" class="action-box" style="display: none;">
                 <select id="res-selector" onchange="gantiResolusi()">
-                    <option value="480">SD - 480p (Hemat Data/Lancar)</option>
-                    <option value="720" selected>HD - 720p (Standar)</option>
-                    <option value="1080">Full HD - 1080p (Butuh Sinyal Kuat)</option>
+                    <option value="480">SD - 480p</option>
+                    <option value="720" selected>HD - 720p</option>
+                    <option value="1080">FHD - 1080p</option>
                 </select>
-                <button class="btn-small btn-copy" onclick="copyID()">SALIN ID</button>
-                <button class="btn-small btn-wa" onclick="shareWA()">KIRIM WA</button>
+                <button class="btn-small btn-wa" onclick="shareLinkWA()">KIRIM LINK LIVE KE WA</button>
             </div>
         </div>
-
         <video id="v-main" autoplay playsinline muted></video>
-
-        <div id="panel-operator" style="display: none;">
-            <input type="text" id="input-id" placeholder="PASTE ID KAMERAMEN">
-            <button class="btn btn-operator" style="width: 100%;" onclick="hubungkan()">CONNECT TO VMIX</button>
-        </div>
     </div>
 
     <script>
@@ -74,13 +59,21 @@
         const status = document.getElementById('status-text');
         const idBox = document.getElementById('id-box');
         const kTools = document.getElementById('kameramen-tools');
-        const pOperator = document.getElementById('panel-operator');
         const resSelector = document.getElementById('res-selector');
         
         let stream;
         let peer;
 
-        function pilihMode(mode) {
+        // Cek URL untuk Auto-Connect Operator
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const autoId = urlParams.get('id');
+            if (autoId) {
+                pilihMode('operator', autoId);
+            }
+        };
+
+        function pilihMode(mode, autoId = null) {
             menu.style.display = 'none';
             kerja.style.display = 'block';
             if(mode === 'kameramen') {
@@ -88,88 +81,63 @@
                 mulaiKamera();
                 initPeer(true);
             } else {
-                pOperator.style.display = 'block';
-                status.innerText = "Operator Mode";
-                idBox.innerText = "VMIX";
-                initPeer(false);
+                status.innerText = "Auto-Connecting to Camera...";
+                initPeer(false, autoId);
             }
         }
 
         async function mulaiKamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            
+            if (stream) stream.getTracks().forEach(t => t.stop());
             const res = resSelector.value;
-            let width = 1280, height = 720;
-            
-            if(res === "480") { width = 640; height = 480; }
-            if(res === "1080") { width = 1920; height = 1080; }
-
-            status.innerText = "Membuka Kamera " + res + "p...";
+            let w = 1280, h = 720;
+            if(res === "480") { w = 640; h = 480; }
+            if(res === "1080") { w = 1920; h = 1080; }
 
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: "environment", 
-                        width: { ideal: width }, 
-                        height: { ideal: height },
-                        frameRate: { ideal: 30 } 
-                    },
+                    video: { facingMode: "environment", width: { ideal: w }, height: { ideal: h } },
                     audio: true
                 });
                 video.srcObject = stream;
-                status.innerText = "Kamera Ready (" + res + "p)";
-            } catch (err) {
-                alert("Gagal Akses Kamera!");
-            }
+                status.innerText = "Kamera Siap (" + res + "p)";
+            } catch (err) { alert("Izin Kamera Ditolak!"); }
         }
 
-        function gantiResolusi() {
-            mulaiKamera().then(() => {
-                alert("Resolusi diganti ke " + resSelector.value + "p. Jika sedang live, hubungkan ulang.");
-            });
-        }
+        function gantiResolusi() { mulaiKamera(); }
 
-        function initPeer(isKameramen) {
+        function initPeer(isKameramen, autoId = null) {
             peer = new Peer();
             peer.on('open', (id) => {
                 if(isKameramen) {
                     idBox.innerText = id;
-                    status.innerText = "ID KAMERA ANDA:";
+                } else if(autoId) {
+                    hubungkanOtomatis(autoId);
                 }
             });
 
             if(isKameramen) {
                 peer.on('call', (call) => {
                     call.answer(stream);
-                    status.innerText = "STATUS: LIVE KE VMIX";
-                    idBox.style.color = "#007bff";
+                    status.innerText = "LIVE TERHUBUNG!";
                 });
             }
         }
 
-        function hubungkan() {
-            const tid = document.getElementById('input-id').value;
-            if(!tid) return;
-            status.innerText = "Menghubungkan...";
+        function hubungkanOtomatis(tid) {
             const call = peer.call(tid, null);
             call.on('stream', (remStream) => {
                 video.srcObject = remStream;
                 video.muted = false;
                 status.innerText = "LIVE DARI KAMERAMEN";
-                pOperator.style.display = 'none';
                 idBox.innerText = "CONNECTED";
             });
         }
 
-        function copyID() {
-            navigator.clipboard.writeText(idBox.innerText);
-            alert("ID Disalin!");
-        }
-
-        function shareWA() {
-            const text = encodeURIComponent("ID Kamera Live: " + idBox.innerText);
+        function shareLinkWA() {
+            const id = idBox.innerText;
+            const baseURL = window.location.href.split('?')[0];
+            const fullLink = `${baseURL}?id=${id}`;
+            const text = encodeURIComponent("Klik link ini untuk melihat LIVE kamera saya di vMix: " + fullLink);
             window.open(`https://wa.me/?text=${text}`, '_blank');
         }
     </script>
