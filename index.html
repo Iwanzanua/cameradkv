@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LemonBooth Full Screen</title>
+    <title>LemonBooth Full Screen View</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { 
@@ -11,96 +11,48 @@
             height: 100%; 
             overflow: hidden; 
             background-color: #000; 
-            font-family: sans-serif;
         }
 
-        /* Video Full Screen */
+        /* Video memenuhi seluruh layar tanpa tombol apapun */
         #video {
             position: absolute;
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Memastikan kamera memenuhi layar */
+            object-fit: cover;
             z-index: 1;
         }
 
-        /* Overlay Kontrol */
-        .controls {
+        /* Dropdown kamera tetap ada namun dibuat semi-transparan di pojok */
+        /* Agar kamu tetap bisa pindah ke kamera belakang */
+        #cameraSelect {
             position: absolute;
-            bottom: 30px;
-            left: 0;
-            right: 0;
+            top: 10px;
+            left: 10px;
             z-index: 10;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-        }
-
-        select {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.4);
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 5px;
             border-radius: 5px;
-            width: 80%;
-            max-width: 300px;
-        }
-
-        .capture-btn {
-            width: 70px;
-            height: 70px;
-            background-color: white;
-            border: 5px solid rgba(0, 0, 0, 0.2);
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        }
-
-        .capture-btn:active {
-            transform: scale(0.9);
-            background-color: #ddd;
-        }
-
-        /* Preview Hasil */
-        #photo-preview {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 100px;
-            height: 150px;
-            border: 2px solid white;
-            object-fit: cover;
-            z-index: 5;
-            display: none;
-            border-radius: 5px;
+            font-size: 12px;
+            max-width: 150px;
+            outline: none;
         }
     </style>
 </head>
 <body>
 
+    <select id="cameraSelect">
+        <option value="">Mencari Kamera...</option>
+    </select>
+    
     <video id="video" autoplay playsinline></video>
-    <img id="photo-preview">
-
-    <div class="controls">
-        <select id="cameraSelect">
-            <option value="">Mencari Kamera...</option>
-        </select>
-        
-        <div class="capture-btn" id="captureBtn"></div>
-    </div>
-
-    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
         const cameraSelect = document.getElementById('cameraSelect');
-        const captureBtn = document.getElementById('captureBtn');
-        const photoPreview = document.getElementById('photo-preview');
-
         let currentStream;
 
-        // 1. Fungsi untuk mendapatkan daftar kamera
         async function getDevices() {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -109,14 +61,11 @@
             videoDevices.forEach((device, i) => {
                 const option = document.createElement('option');
                 option.value = device.deviceId;
-                // Memberi label lebih jelas untuk kamera belakang/depan
-                let label = device.label || `Camera ${i + 1}`;
-                option.text = label;
+                option.text = device.label || `Kamera ${i + 1}`;
                 cameraSelect.appendChild(option);
             });
         }
 
-        // 2. Fungsi menjalankan kamera
         async function startCamera(deviceId) {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
@@ -125,8 +74,7 @@
             const constraints = {
                 video: {
                     deviceId: deviceId ? { exact: deviceId } : undefined,
-                    // Jika deviceId tidak ada, paksa cari kamera belakang
-                    facingMode: deviceId ? undefined : "environment",
+                    facingMode: deviceId ? undefined : "environment", // Prioritas kamera belakang
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
                 }
@@ -136,33 +84,17 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 currentStream = stream;
                 video.srcObject = stream;
-                // Refresh list agar label kamera muncul setelah izin diberikan
-                getDevices();
+                getDevices(); // Update label kamera setelah izin diberikan
             } catch (err) {
                 console.error("Gagal akses kamera: ", err);
-                alert("Kamera tidak ditemukan atau izin ditolak.");
             }
         }
 
-        // 3. Logika Ganti Kamera dari Dropdown
         cameraSelect.onchange = () => {
             startCamera(cameraSelect.value);
         };
 
-        // 4. Logika Ambil Foto
-        captureBtn.onclick = () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const dataUrl = canvas.toDataURL('image/png');
-            photoPreview.src = dataUrl;
-            photoPreview.style.display = 'block';
-        };
-
-        // Jalankan saat pertama kali dibuka
-        // Langsung minta izin kamera
+        // Jalankan otomatis
         startCamera();
     </script>
 </body>
