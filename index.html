@@ -2,145 +2,136 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DKV Muhlibat - Cam Fix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DKV Muhlibat - Internet Cam</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 15px; }
-        .hidden { display: none; }
-        .container { max-width: 500px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; border: 2px solid #333; }
-        .btn { padding: 12px 20px; margin: 8px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; max-width: 250px; transition: 0.3s; }
-        .btn-cam { background: #e74c3c; color: white; }
-        .btn-op { background: #3498db; color: white; }
-        .btn-reset { background: #555; color: #ccc; font-size: 10px; margin-top: 20px; }
-        input, select { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #252525; color: white; margin-bottom: 10px; width: 80%; }
-        #status { font-weight: bold; color: #f1c40f; margin: 15px 0; font-size: 14px; }
-        .id-display { font-size: 40px; font-weight: 800; color: #2ecc71; letter-spacing: 5px; margin: 10px 0; }
+        body { font-family: sans-serif; background: #121212; color: white; text-align: center; padding: 20px; }
+        .box { max-width: 400px; margin: auto; background: #222; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        video { width: 100%; border-radius: 10px; margin-top: 10px; background: #000; }
+        .id-text { font-size: 3rem; color: #2ecc71; font-weight: bold; margin: 10px 0; }
+        .btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-red { background: #e74c3c; color: white; }
+        .btn-blue { background: #3498db; color: white; }
+        select, input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 5px; border: none; }
+        #status { font-size: 0.9rem; color: #f1c40f; min-height: 20px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>DKV MUHLIBAT</h2>
-    <div id="status">Sistem Kamera Wireless</div>
+<div class="box">
+    <h2>DKV MUHLIBAT v2</h2>
+    <div id="status">Menginisialisasi...</div>
 
     <div id="menu">
-        <button class="btn btn-cam" onclick="startKameramen()">MODE KAMERAMEN</button>
-        <button class="btn btn-op" onclick="startOperator()">MODE OPERATOR (vMix)</button>
+        <button class="btn btn-red" onclick="initPeer('cam')">MULAI KAMERAMEN</button>
+        <button class="btn btn-blue" onclick="initPeer('op')">MULAI OPERATOR (VMIX)</button>
     </div>
 
-    <div id="ui-kameramen" class="hidden">
-        <p>ID Kamera Anda (Statik):</p>
-        <div id="my-id" class="id-display">----</div>
-        
-        <select id="res" onchange="applyResolution()">
-            <option value="720">Resolusi: HD 720p</option>
-            <option value="1080">Resolusi: Full HD 1080p</option>
-            <option value="480">Resolusi: SD 480p</option>
+    <div id="ui-cam" style="display:none">
+        <p>ID KAMERA ANDA:</p>
+        <div id="display-id" class="id-text">----</div>
+        <select id="res" onchange="startStream()">
+            <option value="720">HD 720p (Stabil)</option>
+            <option value="1080">Full HD 1080p (Butuh Sinyal Kuat)</option>
+            <option value="480">SD 480p (Hemat Kuota)</option>
         </select>
-        
         <video id="preview" autoplay muted playsinline></video>
-        <button class="btn btn-reset" onclick="resetID()">Ganti ID Baru</button>
+        <p style="font-size: 0.7rem; color: #888;">ID ini akan tetap sama di HP ini meskipun direfresh.</p>
     </div>
 
-    <div id="ui-operator" class="hidden">
-        <input type="text" id="target-id" placeholder="Masukkan 4 Digit ID" maxlength="4">
-        <button class="btn btn-op" onclick="connectToCam()">HUBUNGKAN KE VMIX</button>
-        <video id="remote-video" autoplay playsinline></video>
+    <div id="ui-op" style="display:none">
+        <input type="text" id="input-id" placeholder="Masukkan 4 Digit Kode" maxlength="4">
+        <button class="btn btn-blue" onclick="connectToCam()">HUBUNGKAN SEKARANG</button>
+        <video id="remote-view" autoplay playsinline></video>
     </div>
 </div>
 
 <script>
     let peer = null;
-    let localStream = null;
-
-    // Fungsi mendapatkan atau membuat ID unik untuk HP ini
-    function getPersistentId() {
-        let storedId = localStorage.getItem('muhlibat_cam_id');
-        if (!storedId) {
-            storedId = Math.floor(1000 + Math.random() * 9000).toString();
-            localStorage.setItem('muhlibat_cam_id', storedId);
+    let myStream = null;
+    
+    // Konfigurasi Server Biar Bisa Tembus Internet (STUN Server Google)
+    const peerConfig = {
+        config: {
+            'iceServers': [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ],
+            'sdpSemantics': 'unified-plan'
         }
-        return storedId;
-    }
+    };
 
-    function resetID() {
-        if(confirm("Yakin ingin mengganti ID? ID lama tidak bisa dipakai lagi.")) {
-            localStorage.removeItem('muhlibat_cam_id');
-            location.reload();
+    function getPersistentID() {
+        let id = localStorage.getItem('dkv_id');
+        if (!id) {
+            id = Math.floor(1000 + Math.random() * 9000).toString();
+            localStorage.setItem('dkv_id', id);
         }
+        return id;
     }
 
-    // --- LOGIKA KAMERAMEN ---
-    async function startKameramen() {
-        const shortId = getPersistentId();
-        document.getElementById('menu').classList.add('hidden');
-        document.getElementById('ui-kameramen').classList.remove('hidden');
-        document.getElementById('my-id').innerText = shortId;
-        document.getElementById('status').innerText = "Status: Menunggu Operator...";
-
-        // Inisialisasi Peer dengan ID statik
-        peer = new Peer('dkv-' + shortId);
-
-        await applyResolution();
-
-        peer.on('call', (call) => {
-            document.getElementById('status').innerText = "Status: LIVE (Tersambung)";
-            call.answer(localStream);
-        });
-
-        peer.on('error', (err) => {
-            if(err.type === 'unavailable-id') {
-                alert("ID sudah digunakan! Klik Reset ID.");
-            }
-        });
-    }
-
-    async function applyResolution() {
-        const h = document.getElementById('res').value;
-        const w = h == "1080" ? 1920 : (h == "720" ? 1280 : 854);
+    function initPeer(role) {
+        const id = getPersistentID();
+        document.getElementById('menu').style.display = 'none';
         
-        const constraints = {
-            video: { 
-                width: { ideal: parseInt(w) }, 
-                height: { ideal: parseInt(h) }, 
-                facingMode: "environment" 
-            },
-            audio: true
-        };
-
-        try {
-            if(localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-            }
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            document.getElementById('preview').srcObject = localStream;
-        } catch (err) {
-            console.error(err);
-            alert("Gagal akses kamera. Pastikan menggunakan HTTPS.");
+        if (role === 'cam') {
+            document.getElementById('ui-cam').style.display = 'block';
+            document.getElementById('display-id').innerText = id;
+            peer = new Peer('dkv-muhlibat-' + id, peerConfig);
+            startStream();
+            
+            peer.on('open', () => document.getElementById('status').innerText = "Kamera Siap! Tunggu Operator...");
+            peer.on('call', call => {
+                document.getElementById('status').innerText = "LIVE! Sedang Mengirim Gambar...";
+                call.answer(myStream);
+            });
+        } else {
+            document.getElementById('ui-op').style.display = 'block';
+            peer = new Peer(peerConfig);
+            peer.on('open', () => document.getElementById('status').innerText = "Operator Siap. Masukkan ID Kamera.");
         }
+
+        peer.on('error', err => {
+            console.error(err);
+            document.getElementById('status').innerText = "Error: " + err.type;
+            if(err.type === 'unavailable-id') alert("ID sedang digunakan, coba lagi nanti.");
+        });
     }
 
-    // --- LOGIKA OPERATOR ---
-    function startOperator() {
-        document.getElementById('menu').classList.add('hidden');
-        document.getElementById('ui-operator').classList.remove('hidden');
-        document.getElementById('status').innerText = "Mode: Penerima vMix";
-        peer = new Peer(); 
+    async function startStream() {
+        const h = document.getElementById('res').value;
+        const constraints = { 
+            video: { height: parseInt(h), facingMode: "environment" }, 
+            audio: true 
+        };
+        
+        try {
+            if (myStream) myStream.getTracks().forEach(t => t.stop());
+            myStream = await navigator.mediaDevices.getUserMedia(constraints);
+            document.getElementById('preview').srcObject = myStream;
+        } catch (e) {
+            alert("Akses Kamera Ditolak! Pastikan gunakan HTTPS.");
+        }
     }
 
     function connectToCam() {
-        const code = document.getElementById('target-id').value;
-        document.getElementById('status').innerText = "Menyambungkan ke " + code + "...";
+        const targetId = document.getElementById('input-id').value;
+        document.getElementById('status').innerText = "Menghubungkan ke " + targetId + "...";
         
-        // Memanggil ID statik dkv-XXXX
-        const call = peer.call('dkv-' + code, new MediaStream());
+        const call = peer.call('dkv-muhlibat-' + targetId, new MediaStream());
         
-        call.on('stream', (remoteStream) => {
-            document.getElementById('remote-video').srcObject = remoteStream;
-            document.getElementById('status').innerText = "Status: Menerima Gambar";
+        call.on('stream', remoteStream => {
+            document.getElementById('status').innerText = "Terhubung!";
+            document.getElementById('remote-view').srcObject = remoteStream;
         });
+
+        setTimeout(() => {
+            if (document.getElementById('status').innerText.includes("Menghubungkan")) {
+                document.getElementById('status').innerText = "Koneksi Lambat... Pastikan HP Kameramen sudah buka web.";
+            }
+        }, 5000);
     }
 </script>
 </body>
