@@ -3,114 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kameramen Mobile - vMix Connect</title>
+    <title>vMix Remote Cam</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        body, html { width: 100%; height: 100%; background: #111; color: white; font-family: sans-serif; }
         
-        /* Video Full Screen untuk Kameramen */
-        #video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        /* Menu Pilihan Utama */
+        #menu-utama {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; gap: 20px; padding: 20px; text-align: center;
+        }
+        .btn-pilih {
+            width: 100%; max-width: 300px; padding: 20px; font-size: 18px; font-weight: bold;
+            border: none; border-radius: 10px; cursor: pointer; transition: 0.3s;
+        }
+        .btn-kameramen { background: #28a745; color: white; }
+        .btn-operator { background: #007bff; color: white; }
+
+        /* Area Kamera (Kameramen & Operator) */
+        #area-kerja { display: none; position: relative; height: 100vh; width: 100%; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* Overlay Status di Atas */
-        .status-bar {
-            position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-            background: rgba(0,0,0,0.7); padding: 15px; text-align: center;
-            border-bottom: 2px solid #28a745;
+        .overlay-status {
+            position: absolute; top: 0; left: 0; right: 0; padding: 15px;
+            background: rgba(0,0,0,0.8); text-align: center; z-index: 10;
         }
+        .id-box { font-size: 24px; color: #0f0; font-weight: bold; margin-top: 5px; letter-spacing: 2px; }
 
-        .id-text { font-size: 18px; font-weight: bold; color: #0f0; margin-top: 5px; }
-        .info { font-size: 11px; color: #ccc; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Panel vMix (Muncul di Laptop) */
-        .vmix-panel {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 20; background: rgba(0,0,0,0.8); padding: 15px;
-            border-radius: 10px; border: 1px solid #444; width: 90%; max-width: 350px;
+        /* Panel Input Operator */
+        #panel-operator {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; background: rgba(255,255,255,0.1);
+            padding: 20px; border-radius: 15px; backdrop-filter: blur(10px); z-index: 20;
         }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; text-align: center; font-size: 16px; }
-        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 5px; border: none; font-size: 18px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="status-bar">
-        <div class="info">Status: <span id="peer-status">Connecting...</span></div>
-        <div id="display-id" class="id-text">SEDANG GENERATE ID...</div>
+    <div id="menu-utama">
+        <h1>Remote Cam vMix</h1>
+        <p>Pilih peran kamu saat ini:</p>
+        <button class="btn-pilih btn-kameramen" onclick="mulaiKameramen()">SAYA KAMERAMEN</button>
+        <button class="btn-pilih btn-operator" onclick="mulaiOperator()">SAYA OPERATOR VMIX</button>
     </div>
 
-    <video id="video" autoplay playsinline muted></video>
+    <div id="area-kerja">
+        <div class="overlay-status">
+            <div id="status-info">Inisialisasi...</div>
+            <div id="display-id" class="id-box">----</div>
+        </div>
 
-    <div class="vmix-panel" id="operator-panel">
-        <input type="text" id="target-id" placeholder="MASUKKAN ID DARI HP">
-        <button onclick="panggilKameramen()">HUBUNGKAN KE VMIX</button>
+        <video id="video-display" autoplay playsinline muted></video>
+
+        <div id="panel-operator" style="display: none;">
+            <input type="text" id="input-id-hp" placeholder="KETIK ID HP DISINI">
+            <button class="btn-pilih btn-operator" style="padding: 10px;" onclick="hubungkanKeKameramen()">CONNECT TO CAMERA</button>
+        </div>
     </div>
 
     <script>
-        const videoElemen = document.getElementById('video');
+        const menuUtama = document.getElementById('menu-utama');
+        const areaKerja = document.getElementById('area-kerja');
+        const videoElemen = document.getElementById('video-display');
+        const statusInfo = document.getElementById('status-info');
         const displayId = document.getElementById('display-id');
-        const statusText = document.getElementById('peer-status');
+        const panelOperator = document.getElementById('panel-operator');
+        
         let localStream;
+        let peer;
 
-        // 1. Inisialisasi Kamera
-        async function initCamera() {
+        // FUNGSI KAMERAMEN
+        async function mulaiKameramen() {
+            menuUtama.style.display = 'none';
+            areaKerja.style.display = 'block';
+            statusInfo.innerText = "Membuka Kamera...";
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: "environment", // Kamera Belakang
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: 1280, height: 720 },
                     audio: true
                 });
-                localStream = stream;
-                videoElemen.srcObject = stream;
-                console.log("Kamera Aktif");
-            } catch (e) {
-                alert("Izin Kamera Ditolak! Harap Izinkan Kamera agar ID Muncul.");
+                videoElemen.srcObject = localStream;
+                statusInfo.innerText = "Mencari ID di Server...";
+                
+                initPeerConnection(true); // true = sebagai kameramen
+            } catch (err) {
+                alert("Gagal buka kamera. Pastikan klik ALLOW!");
+                location.reload();
             }
         }
 
-        // 2. Inisialisasi Koneksi Peer
-        const peer = new Peer();
-
-        peer.on('open', (id) => {
-            statusText.innerText = "ONLINE";
-            displayId.innerText = id; // Menampilkan ID unik
-            console.log("ID Anda: " + id);
-        });
-
-        // Event saat ada panggilan masuk (dari Operator vMix)
-        peer.on('call', (call) => {
-            console.log("Menerima panggilan dari vMix...");
-            call.answer(localStream); // Mengirim video ke vMix
+        // FUNGSI OPERATOR
+        function mulaiOperator() {
+            menuUtama.style.display = 'none';
+            areaKerja.style.display = 'block';
+            panelOperator.style.display = 'block';
+            statusInfo.innerText = "Siap Menghubungkan";
+            displayId.innerText = "VMIX MODE";
             
-            call.on('stream', (remoteStream) => {
-                // Video sudah terkirim!
-                statusText.innerText = "CONNECTED TO VMIX";
+            initPeerConnection(false);
+        }
+
+        // INISIALISASI PEERJS
+        function initPeerConnection(isKameramen) {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                if(isKameramen) {
+                    statusInfo.innerText = "KASIH ID INI KE OPERATOR:";
+                    displayId.innerText = id;
+                }
             });
-        });
 
-        // 3. Fungsi untuk Operator (dijalankan di browser laptop)
-        function panggilKameramen() {
-            const idKameramen = document.getElementById('target-id').value;
-            if (!idKameramen) return alert("Isi ID Kameramen dulu!");
+            if(isKameramen) {
+                // Menunggu panggilan dari vMix
+                peer.on('call', (call) => {
+                    call.answer(localStream);
+                    statusInfo.innerText = "TERHUBUNG KE VMIX!";
+                });
+            }
 
-            const call = peer.call(idKameramen, localStream);
-            call.on('stream', (remoteStream) => {
-                // Tampilkan video kameramen di layar laptop
-                videoElemen.srcObject = remoteStream;
-                statusText.innerText = "RECEIVING LIVE VIDEO";
-                document.getElementById('operator-panel').style.display = 'none';
+            peer.on('error', (err) => {
+                console.error(err);
+                statusInfo.innerText = "Error: " + err.type;
             });
         }
 
-        peer.on('error', (err) => {
-            console.error(err);
-            statusText.innerText = "ERROR: " + err.type;
-        });
+        // LOGIKA OPERATOR MEMANGGIL HP
+        function hubungkanKeKameramen() {
+            const targetId = document.getElementById('input-id-hp').value;
+            if(!targetId) return alert("Isi ID-nya dulu!");
 
-        initCamera();
+            statusInfo.innerText = "Menghubungkan ke " + targetId + "...";
+            
+            // Operator memanggil HP (tanpa kirim video, hanya terima)
+            const call = peer.call(targetId, null); 
+            
+            call.on('stream', (remoteStream) => {
+                videoElemen.srcObject = remoteStream;
+                videoElemen.muted = false; // Agar suara dari HP terdengar di vMix
+                statusInfo.innerText = "LIVE DARI KAMERAMEN";
+                panelOperator.style.display = 'none';
+            });
+        }
     </script>
 </body>
 </html>
