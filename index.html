@@ -3,155 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Camera Live DKV</title>
+    <title>DKV Muhlibat - Cam Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-        
-        /* Video Setup */
-        #v-main { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; background: #000; }
-
-        /* UI Overlay */
-        .overlay { position: absolute; top: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent); text-align: center; z-index: 10; }
-        .status-pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; border: 1px solid #444; }
-        .id-text { font-size: 32px; color: #00ff00; font-weight: bold; font-family: monospace; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,0,0.5); }
-
-        /* Menu Utama */
-        #menu { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 25px; z-index: 20; position: relative; background: #0a0a0a; padding: 30px; }
-        h1 { font-size: 24px; letter-spacing: 3px; color: #fff; margin-bottom: 10px; }
-        .btn-mode { width: 100%; max-width: 320px; padding: 22px; border-radius: 16px; border: none; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
-        .btn-kam { background: #fff; color: #000; }
-        .btn-op { background: transparent; color: #fff; border: 2px solid #333; }
-        .btn-mode:active { transform: scale(0.96); opacity: 0.8; }
-
-        /* Tombol Copy */
-        .copy-box { margin-top: 15px; }
-        .btn-copy { background: #222; color: #fff; border: 1px solid #444; padding: 12px 25px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .btn-copy:hover { background: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 15px; }
+        .hidden { display: none; }
+        .container { max-width: 500px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; border: 2px solid #333; }
+        .btn { padding: 12px 20px; margin: 8px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; max-width: 250px; transition: 0.3s; }
+        .btn-cam { background: #e74c3c; color: white; }
+        .btn-op { background: #3498db; color: white; }
+        .btn-reset { background: #555; color: #ccc; font-size: 10px; margin-top: 20px; }
+        input, select { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #252525; color: white; margin-bottom: 10px; width: 80%; }
+        #status { font-weight: bold; color: #f1c40f; margin: 15px 0; font-size: 14px; }
+        .id-display { font-size: 40px; font-weight: 800; color: #2ecc71; letter-spacing: 5px; margin: 10px 0; }
     </style>
 </head>
 <body>
 
+<div class="container">
+    <h2>DKV MUHLIBAT</h2>
+    <div id="status">Sistem Kamera Wireless</div>
+
     <div id="menu">
-        <h1>CAMERA LIVE DKV</h1>
-        <button class="btn-mode btn-kam" onclick="startMode('kam')">SAYA KAMERAMEN</button>
-        <button class="btn-mode btn-op" onclick="startMode('op')">MODE OPERATOR VMIX</button>
-        <p style="font-size: 10px; color: #555;">v2.0 Low Latency Mode</p>
+        <button class="btn btn-cam" onclick="startKameramen()">MODE KAMERAMEN</button>
+        <button class="btn btn-op" onclick="startOperator()">MODE OPERATOR (vMix)</button>
     </div>
 
-    <div id="app" style="display:none;">
-        <div class="overlay">
-            <div id="stat" class="status-pill">Inisialisasi...</div>
-            <div id="id-box" class="id-text">----</div>
-            <div id="kam-tools" class="copy-box" style="display:none;">
-                <button class="btn-copy" onclick="copyLink()">SALIN LINK LIVE</button>
-            </div>
-        </div>
-        <video id="v-main" autoplay playsinline muted></video>
+    <div id="ui-kameramen" class="hidden">
+        <p>ID Kamera Anda (Statik):</p>
+        <div id="my-id" class="id-display">----</div>
+        
+        <select id="res" onchange="applyResolution()">
+            <option value="720">Resolusi: HD 720p</option>
+            <option value="1080">Resolusi: Full HD 1080p</option>
+            <option value="480">Resolusi: SD 480p</option>
+        </select>
+        
+        <video id="preview" autoplay muted playsinline></video>
+        <button class="btn btn-reset" onclick="resetID()">Ganti ID Baru</button>
     </div>
 
-    <script>
-        const v = document.getElementById('v-main');
-        const stat = document.getElementById('stat');
-        const idBox = document.getElementById('id-box');
-        let stream, peer;
+    <div id="ui-operator" class="hidden">
+        <input type="text" id="target-id" placeholder="Masukkan 4 Digit ID" maxlength="4">
+        <button class="btn btn-op" onclick="connectToCam()">HUBUNGKAN KE VMIX</button>
+        <video id="remote-video" autoplay playsinline></video>
+    </div>
+</div>
 
-        // Auto-Check URL
-        const params = new URLSearchParams(window.location.search);
-        const autoId = params.get('id');
-        if (autoId) startMode('op', autoId);
+<script>
+    let peer = null;
+    let localStream = null;
 
-        function startMode(mode, aid = null) {
-            document.getElementById('menu').style.display = 'none';
-            document.getElementById('app').style.display = 'block';
-            
-            if (mode === 'kam') {
-                document.getElementById('kam-tools').style.display = 'block';
-                setupCamera().then(() => initPeer(true));
-            } else {
-                initPeer(false, aid);
+    // Fungsi mendapatkan atau membuat ID unik untuk HP ini
+    function getPersistentId() {
+        let storedId = localStorage.getItem('muhlibat_cam_id');
+        if (!storedId) {
+            storedId = Math.floor(1000 + Math.random() * 9000).toString();
+            localStorage.setItem('muhlibat_cam_id', storedId);
+        }
+        return storedId;
+    }
+
+    function resetID() {
+        if(confirm("Yakin ingin mengganti ID? ID lama tidak bisa dipakai lagi.")) {
+            localStorage.removeItem('muhlibat_cam_id');
+            location.reload();
+        }
+    }
+
+    // --- LOGIKA KAMERAMEN ---
+    async function startKameramen() {
+        const shortId = getPersistentId();
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('ui-kameramen').classList.remove('hidden');
+        document.getElementById('my-id').innerText = shortId;
+        document.getElementById('status').innerText = "Status: Menunggu Operator...";
+
+        // Inisialisasi Peer dengan ID statik
+        peer = new Peer('dkv-' + shortId);
+
+        await applyResolution();
+
+        peer.on('call', (call) => {
+            document.getElementById('status').innerText = "Status: LIVE (Tersambung)";
+            call.answer(localStream);
+        });
+
+        peer.on('error', (err) => {
+            if(err.type === 'unavailable-id') {
+                alert("ID sudah digunakan! Klik Reset ID.");
             }
-        }
+        });
+    }
 
-        async function setupCamera() {
-            try {
-                // Konfigurasi Ultra-Low Latency (SD Optimized)
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: "environment", 
-                        width: { ideal: 640 }, 
-                        height: { ideal: 480 },
-                        frameRate: { max: 24 } // Frame rate konsisten mengurangi jitter
-                    },
-                    audio: { echoCancellation: true, noiseSuppression: true }
-                });
-                v.srcObject = stream;
-            } catch (e) { alert("Akses Kamera Ditolak!"); }
-        }
+    async function applyResolution() {
+        const h = document.getElementById('res').value;
+        const w = h == "1080" ? 1920 : (h == "720" ? 1280 : 854);
+        
+        const constraints = {
+            video: { 
+                width: { ideal: parseInt(w) }, 
+                height: { ideal: parseInt(h) }, 
+                facingMode: "environment" 
+            },
+            audio: true
+        };
 
-        function initPeer(isKam, aid = null) {
-            // Gunakan STUN server global agar jabat tangan lebih cepat
-            peer = new Peer({
-                config: {'iceServers': [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]}
-            });
-            
-            peer.on('open', (id) => {
-                if(isKam) {
-                    idBox.innerText = id;
-                    stat.innerText = "Kamera Siap";
-                } else if(aid) {
-                    connectTo(aid);
-                }
-            });
-
-            if(isKam) {
-                peer.on('call', (call) => {
-                    // Paksa koneksi langsung tanpa negosiasi lama
-                    call.answer(stream);
-                    stat.innerText = "LIVE TERHUBUNG";
-                    stat.style.borderColor = "#00ff00";
-                    stat.style.color = "#00ff00";
-                });
+        try {
+            if(localStream) {
+                localStream.getTracks().forEach(track => track.stop());
             }
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            document.getElementById('preview').srcObject = localStream;
+        } catch (err) {
+            console.error(err);
+            alert("Gagal akses kamera. Pastikan menggunakan HTTPS.");
         }
+    }
 
-        function connectTo(tid) {
-            stat.innerText = "Connecting...";
-            // Setting metadata agar stream dianggap prioritas
-            const call = peer.call(tid, null);
-            
-            let retry = setTimeout(() => {
-                if (stat.innerText !== "LIVE") connectTo(tid);
-            }, 3500);
+    // --- LOGIKA OPERATOR ---
+    function startOperator() {
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('ui-operator').classList.remove('hidden');
+        document.getElementById('status').innerText = "Mode: Penerima vMix";
+        peer = new Peer(); 
+    }
 
-            call.on('stream', (rem) => {
-                clearTimeout(retry);
-                v.srcObject = rem;
-                v.muted = false; // Aktifkan suara di sisi vMix
-                stat.innerText = "LIVE";
-                stat.style.borderColor = "#00ff00";
-                idBox.innerText = "VMIX CONNECTED";
-            });
-        }
-
-        function copyLink() {
-            const link = window.location.href.split('?')[0] + "?id=" + idBox.innerText;
-            navigator.clipboard.writeText(link).then(() => {
-                const btn = document.querySelector('.btn-copy');
-                btn.innerText = "LINK DISALIN!";
-                btn.style.background = "#00ff00";
-                btn.style.color = "#000";
-                setTimeout(() => {
-                    btn.innerText = "SALIN LINK LIVE";
-                    btn.style.background = "#222";
-                    btn.style.color = "#fff";
-                }, 2000);
-            });
-        }
-    </script>
+    function connectToCam() {
+        const code = document.getElementById('target-id').value;
+        document.getElementById('status').innerText = "Menyambungkan ke " + code + "...";
+        
+        // Memanggil ID statik dkv-XXXX
+        const call = peer.call('dkv-' + code, new MediaStream());
+        
+        call.on('stream', (remoteStream) => {
+            document.getElementById('remote-video').srcObject = remoteStream;
+            document.getElementById('status').innerText = "Status: Menerima Gambar";
+        });
+    }
+</script>
 </body>
 </html>
