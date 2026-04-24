@@ -3,67 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generator Prompt Infografis - Muhliba</title>
+    <title>Generator Prompt Infografis - Muhlibat</title>
     <style>
         :root {
             --primary: #0056b3;
             --secondary: #ffc107;
+            --success: #28a745;
             --light: #f8f9fa;
             --dark: #343a40;
         }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f7; color: var(--dark); padding: 20px; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: var(--primary); margin-bottom: 5px; }
-        p.subtitle { text-align: center; font-size: 0.9em; margin-bottom: 25px; color: #666; }
-        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; }
-        select, textarea, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 5px; text-transform: uppercase; }
+        p.subtitle { text-align: center; font-size: 0.9em; margin-bottom: 25px; color: #666; border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .full-width { grid-column: span 2; }
+        
+        label { font-weight: bold; display: block; margin-top: 10px; margin-bottom: 5px; font-size: 0.9em; }
+        select, textarea, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        textarea { resize: vertical; }
+        
         .btn-group { margin-top: 25px; display: flex; gap: 10px; }
-        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 16px; }
         .btn-generate { background: var(--primary); color: white; }
         .btn-generate:hover { background: #004494; }
-        .btn-copy { background: #28a745; color: white; display: none; }
-        #resultArea { margin-top: 20px; padding: 15px; background: #f1f1f1; border-left: 5px solid var(--primary); border-radius: 5px; display: none; white-space: pre-wrap; font-size: 0.95em; }
+        .btn-copy { background: var(--success); color: white; display: none; }
+        .btn-copy:hover { background: #218838; }
+
+        #resultArea { 
+            margin-top: 20px; padding: 20px; background: #f9f9f9; 
+            border: 1px dashed var(--primary); border-left: 5px solid var(--primary); 
+            border-radius: 5px; display: none; white-space: pre-wrap; 
+            font-size: 0.9em; line-height: 1.6; color: #333;
+        }
+        .info-box { background: #fff3cd; padding: 10px; border-radius: 5px; font-size: 0.8em; margin-bottom: 15px; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Muhliba Infographic Prompt</h2>
-    <p class="subtitle">SMK Muhammadiyah 5 Babat - Media Pembelajaran Digital</p>
+    <h2>Generator Prompt Infografis</h2>
+    <p class="subtitle">SMK Muhammadiyah 5 Babat (Muhlibat)</p>
 
-    <label for="mapel">Pilih Mata Pelajaran:</label>
-    <select id="mapel">
-        <optgroup label="Mapel Umum">
-            <option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option>
-            <option value="Bahasa Indonesia">Bahasa Indonesia</option>
-            <option value="Matematika">Matematika</option>
-            <option value="Sejarah">Sejarah</option>
-            <option value="Bahasa Inggris">Bahasa Inggris</option>
-        </optgroup>
-        <optgroup label="Mapel Kejuruan">
-            <option value="Teknik Komputer dan Jaringan">Teknik Komputer dan Jaringan (TKJ)</option>
-            <option value="Akuntansi">Akuntansi</option>
-            <option value="Farmasi">Farmasi</option>
-            <option value="Asisten Keperawatan">Asisten Keperawatan</option>
-        </optgroup>
-    </select>
+    <div class="info-box">
+        <strong>Tips Google Drive:</strong> Pastikan file logo diatur ke "Anyone with the link". Gunakan ID file saja jika ingin link direct.
+    </div>
 
-    <label for="tema">Tema/Judul Infografis:</label>
-    <input type="text" id="tema" placeholder="Contoh: Langkah Instalasi Linux atau Siklus Akuntansi">
+    <div class="grid">
+        <div class="full-width">
+            <label for="urlLogo">URL Logo Sekolah (Direct Link/GDrive):</label>
+            <input type="text" id="urlLogo" placeholder="Contoh: https://drive.google.com/uc?export=view&id=ID_FILE_ANDA" value="">
+        </div>
 
-    <label for="ukuran">Ukuran Desain:</label>
-    <select id="ukuran">
-        <option value="Portrait (1080x1350)">Portrait (Instagram/Mobile)</option>
-        <option value="Landscape (1920x1080)">Landscape (Presentasi)</option>
-        <option value="Poster (A4/A3)">Poster (Cetak)</option>
-    </select>
+        <div>
+            <label for="instagram">Instagram Sekolah:</label>
+            <input type="text" id="instagram" value="@smk_muhlibat">
+        </div>
+        <div>
+            <label for="website">Website Sekolah:</label>
+            <input type="text" id="website" value="www.smkmuhlibat.sch.id">
+        </div>
 
-    <label for="materi">Catatan Materi (Isi Inti):</label>
-    <textarea id="materi" rows="5" placeholder="Masukkan poin-poin materi yang ingin dimasukkan ke dalam infografis..."></textarea>
+        <div>
+            <label for="mapel">Mata Pelajaran:</label>
+            <select id="mapel">
+                <optgroup label="Umum">
+                    <option>Pendidikan Agama Islam</option>
+                    <option>Bahasa Indonesia</option>
+                    <option>Matematika</option>
+                    <option>Sejarah</option>
+                    <option>Bahasa Inggris</option>
+                </optgroup>
+                <optgroup label="Kejuruan (TKJ)">
+                    <option>Dasar Program Keahlian</option>
+                    <option>Administrasi Infrastruktur Jaringan</option>
+                    <option>Teknologi Layanan Jaringan</option>
+                    <option>Keamanan Jaringan</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <div>
+            <label for="ukuran">Ukuran Desain:</label>
+            <select id="ukuran">
+                <option value="Portrait (1080x1350)">Portrait (Sosmed)</option>
+                <option value="Landscape (1920x1080)">Landscape (Presentasi)</option>
+                <option value="Poster (A4/A3)">Poster (Cetak)</option>
+            </select>
+        </div>
+
+        <div class="full-width">
+            <label for="tema">Tema/Judul Infografis:</label>
+            <input type="text" id="tema" placeholder="Contoh: Pengenalan Topologi Jaringan">
+        </div>
+
+        <div class="full-width">
+            <label for="materi">Catatan Materi (Isi Inti):</label>
+            <textarea id="materi" rows="5" placeholder="Masukkan poin-poin materi di sini..."></textarea>
+        </div>
+    </div>
 
     <div class="btn-group">
-        <button class="btn-generate" onclick="generatePrompt()">Buat Prompt</button>
-        <button id="copyBtn" class="btn-copy" onclick="copyToClipboard()">Salin Prompt</button>
+        <button class="btn-generate" onclick="generatePrompt()">1. Buat Prompt</button>
+        <button id="copyBtn" class="btn-copy" onclick="copyAndOpenGemini()">2. Salin & Buka Gemini AI</button>
     </div>
 
     <div id="resultArea"></div>
@@ -71,44 +114,63 @@
 
 <script>
     function generatePrompt() {
+        const urlLogo = document.getElementById('urlLogo').value;
+        const ig = document.getElementById('instagram').value;
+        const web = document.getElementById('website').value;
         const mapel = document.getElementById('mapel').value;
         const tema = document.getElementById('tema').value;
         const ukuran = document.getElementById('ukuran').value;
         const materi = document.getElementById('materi').value;
 
         if (!tema || !materi) {
-            alert("Harap isi Tema dan Materi terlebih dahulu!");
+            alert("Mohon isi Tema dan Materi!");
             return;
         }
 
-        const prompt = `Buatkan struktur konten untuk sebuah infografis sekolah SMK Muhammadiyah 5 Babat.
+        const prompt = `Buatkan struktur konten untuk infografis sekolah SMK Muhammadiyah 5 Babat.
 
-Detail Informasi:
+IDENTITAS VISUAL WAJIB:
+- Logo Utama: ${urlLogo || 'Gunakan Logo Resmi SMK Muhlibat'}
+- Warna Tema: Dominan Biru dan Kuning (sesuai identitas Muhammadiyah)
+- Media Sosial: Instagram ${ig} | Web: ${web}
+
+DETAIL KONTEN:
 - Mata Pelajaran: ${mapel}
 - Tema Utama: ${tema}
 - Ukuran Desain: ${ukuran}
 - Materi Inti: ${materi}
 
-Instruksi Konten:
-1. Buat judul yang menarik dan relevan.
-2. Bagi materi ke dalam maksimal 5-6 poin singkat agar mudah dibaca.
-3. Berikan saran visual (icon atau gambar) untuk setiap poin.
-4. Tambahkan bagian "Tips Singkat" atau "Tahukah Kamu?".
-5. Sertakan footer bertuliskan: "Media Belajar SMK Muhammadiyah 5 Babat".
-6. Gunakan gaya bahasa yang edukatif namun mudah dipahami siswa SMK.
+INSTRUKSI KONTEN:
+1. Buat judul yang sangat menarik dan relevan untuk siswa SMK.
+2. Bagi materi ke dalam maksimal 5-6 poin singkat agar tidak padat.
+3. Berikan saran visual (icon atau gambar) untuk setiap poin materi.
+4. Tambahkan bagian khusus "Tips Singkat" atau "Tahukah Kamu?".
+5. Sertakan footer: "Media Belajar SMK Muhammadiyah 5 Babat".
+6. Gunakan gaya bahasa edukatif, profesional, namun mudah dipahami.
 
-Tampilkan dalam format teks yang rapi agar saya bisa langsung menyusunnya di aplikasi desain (Canva/Corel).`;
+Tampilkan dalam format teks rapi untuk saya susun di Canva/Corel.`;
 
         const resultArea = document.getElementById('resultArea');
         resultArea.innerText = prompt;
         resultArea.style.display = 'block';
         document.getElementById('copyBtn').style.display = 'block';
+        
+        // Scroll otomatis ke hasil
+        resultArea.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function copyToClipboard() {
+    function copyAndOpenGemini() {
         const text = document.getElementById('resultArea').innerText;
+        
+        // Proses menyalin teks
         navigator.clipboard.writeText(text).then(() => {
-            alert("Prompt berhasil disalin! Silakan paste di Gemini AI.");
+            alert("Prompt telah disalin! Tab Gemini akan dibuka. Silakan tekan Ctrl+V di kolom chat Gemini.");
+            
+            // Membuka Gemini di tab baru
+            window.open('https://gemini.google.com/', '_blank');
+        }).catch(err => {
+            console.error('Gagal menyalin: ', err);
+            alert("Gagal menyalin otomatis. Silakan blok teks hasil dan salin manual.");
         });
     }
 </script>
