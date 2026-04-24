@@ -1,220 +1,117 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>DKV LIVE LINK</title>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<style>
-body{
-margin:0;
-font-family:Arial;
-background:#000;
-color:#fff;
-text-align:center;
-}
-video{
-width:100%;
-height:100vh;
-object-fit:cover;
-background:#000;
-}
-.panel{
-position:fixed;
-top:20px;
-left:20px;
-z-index:10;
-background:rgba(0,0,0,.75);
-padding:15px;
-border-radius:12px;
-width:320px;
-}
-input,button{
-width:100%;
-padding:12px;
-margin:5px 0;
-font-size:17px;
-border:none;
-border-radius:8px;
-box-sizing:border-box;
-}
-input{background:#222;color:#fff;}
-button{background:#00c853;color:#fff;font-weight:bold;cursor:pointer;}
-#status{margin-top:10px;color:#00ff99;font-size:14px;}
-.small{font-size:12px;color:#ccc;word-break:break-all;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Prompt Infografis - Muhliba</title>
+    <style>
+        :root {
+            --primary: #0056b3;
+            --secondary: #ffc107;
+            --light: #f8f9fa;
+            --dark: #343a40;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f7; color: var(--dark); padding: 20px; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+        p.subtitle { text-align: center; font-size: 0.9em; margin-bottom: 25px; color: #666; }
+        label { font-weight: bold; display: block; margin-top: 15px; margin-bottom: 5px; }
+        select, textarea, input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-group { margin-top: 25px; display: flex; gap: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-generate { background: var(--primary); color: white; }
+        .btn-generate:hover { background: #004494; }
+        .btn-copy { background: #28a745; color: white; display: none; }
+        #resultArea { margin-top: 20px; padding: 15px; background: #f1f1f1; border-left: 5px solid var(--primary); border-radius: 5px; display: none; white-space: pre-wrap; font-size: 0.95em; }
+    </style>
 </head>
 <body>
 
-<div class="panel">
+<div class="container">
+    <h2>Muhliba Infographic Prompt</h2>
+    <p class="subtitle">SMK Muhammadiyah 5 Babat - Media Pembelajaran Digital</p>
 
-<h2>DKV LIVE PRO</h2>
+    <label for="mapel">Pilih Mata Pelajaran:</label>
+    <select id="mapel">
+        <optgroup label="Mapel Umum">
+            <option value="Pendidikan Agama Islam">Pendidikan Agama Islam</option>
+            <option value="Bahasa Indonesia">Bahasa Indonesia</option>
+            <option value="Matematika">Matematika</option>
+            <option value="Sejarah">Sejarah</option>
+            <option value="Bahasa Inggris">Bahasa Inggris</option>
+        </optgroup>
+        <optgroup label="Mapel Kejuruan">
+            <option value="Teknik Komputer dan Jaringan">Teknik Komputer dan Jaringan (TKJ)</option>
+            <option value="Akuntansi">Akuntansi</option>
+            <option value="Farmasi">Farmasi</option>
+            <option value="Asisten Keperawatan">Asisten Keperawatan</option>
+        </optgroup>
+    </select>
 
-<button onclick="startCam()">📷 Kamera HP</button>
+    <label for="tema">Tema/Judul Infografis:</label>
+    <input type="text" id="tema" placeholder="Contoh: Langkah Instalasi Linux atau Siklus Akuntansi">
 
-<input id="room" placeholder="Masukkan kode room">
+    <label for="ukuran">Ukuran Desain:</label>
+    <select id="ukuran">
+        <option value="Portrait (1080x1350)">Portrait (Instagram/Mobile)</option>
+        <option value="Landscape (1920x1080)">Landscape (Presentasi)</option>
+        <option value="Poster (A4/A3)">Poster (Cetak)</option>
+    </select>
 
-<button onclick="joinRoom()">🎬 Operator / vMix</button>
+    <label for="materi">Catatan Materi (Isi Inti):</label>
+    <textarea id="materi" rows="5" placeholder="Masukkan poin-poin materi yang ingin dimasukkan ke dalam infografis..."></textarea>
 
-<div id="status">READY</div>
-<div class="small" id="linkbox"></div>
+    <div class="btn-group">
+        <button class="btn-generate" onclick="generatePrompt()">Buat Prompt</button>
+        <button id="copyBtn" class="btn-copy" onclick="copyToClipboard()">Salin Prompt</button>
+    </div>
 
+    <div id="resultArea"></div>
 </div>
 
-<video id="video" autoplay playsinline muted></video>
-
 <script>
+    function generatePrompt() {
+        const mapel = document.getElementById('mapel').value;
+        const tema = document.getElementById('tema').value;
+        const ukuran = document.getElementById('ukuran').value;
+        const materi = document.getElementById('materi').value;
 
-const SIGNAL_SERVER = "https://yourdomain.com"; // ganti domain server nodejs
-const socket = io(SIGNAL_SERVER,{transports:["websocket"]});
+        if (!tema || !materi) {
+            alert("Harap isi Tema dan Materi terlebih dahulu!");
+            return;
+        }
 
-const video = document.getElementById("video");
-const statusBox = document.getElementById("status");
-const linkbox = document.getElementById("linkbox");
+        const prompt = `Buatkan struktur konten untuk sebuah infografis sekolah SMK Muhammadiyah 5 Babat.
 
-let pc;
-let localStream;
-let room = "";
+Detail Informasi:
+- Mata Pelajaran: ${mapel}
+- Tema Utama: ${tema}
+- Ukuran Desain: ${ukuran}
+- Materi Inti: ${materi}
 
-const config = {
-iceServers:[
-{urls:"stun:stun.l.google.com:19302"},
-{
-urls:"turn:openrelay.metered.ca:80",
-username:"openrelayproject",
-credential:"openrelayproject"
-}
-]
-};
+Instruksi Konten:
+1. Buat judul yang menarik dan relevan.
+2. Bagi materi ke dalam maksimal 5-6 poin singkat agar mudah dibaca.
+3. Berikan saran visual (icon atau gambar) untuk setiap poin.
+4. Tambahkan bagian "Tips Singkat" atau "Tahukah Kamu?".
+5. Sertakan footer bertuliskan: "Media Belajar SMK Muhammadiyah 5 Babat".
+6. Gunakan gaya bahasa yang edukatif namun mudah dipahami siswa SMK.
 
-function log(txt){
-statusBox.innerText = txt;
-}
+Tampilkan dalam format teks yang rapi agar saya bisa langsung menyusunnya di aplikasi desain (Canva/Corel).`;
 
-function newPeer(){
-pc = new RTCPeerConnection(config);
+        const resultArea = document.getElementById('resultArea');
+        resultArea.innerText = prompt;
+        resultArea.style.display = 'block';
+        document.getElementById('copyBtn').style.display = 'block';
+    }
 
-pc.onicecandidate = e=>{
-if(e.candidate){
-socket.emit("signal",{
-room:room,
-data:{candidate:e.candidate}
-});
-}
-};
-
-pc.ontrack = e=>{
-video.srcObject = e.streams[0];
-video.muted = false;
-};
-
-pc.onconnectionstatechange = ()=>{
-log("STATUS : " + pc.connectionState);
-};
-}
-
-async function startCam(){
-
-room = Math.floor(1000 + Math.random()*9000).toString();
-
-newPeer();
-
-log("Aktifkan kamera...");
-
-localStream = await navigator.mediaDevices.getUserMedia({
-video:{
-facingMode:"environment",
-width:1280,
-height:720
-},
-audio:true
-});
-
-video.srcObject = localStream;
-
-localStream.getTracks().forEach(track=>{
-pc.addTrack(track,localStream);
-});
-
-socket.emit("join",room);
-
-const link = location.origin + location.pathname + "?room=" + room;
-
-linkbox.innerHTML =
-"ROOM : "+room+"<br><br>" +
-"LINK COPY:<br>"+link;
-
-log("Menunggu operator...");
-}
-
-async function joinRoom(){
-
-room = document.getElementById("room").value.trim();
-
-if(!room){
-alert("Masukkan kode room");
-return;
-}
-
-newPeer();
-
-socket.emit("join",room);
-
-log("Menghubungkan...");
-
-const offer = await pc.createOffer();
-await pc.setLocalDescription(offer);
-
-socket.emit("signal",{
-room:room,
-data:{offer:offer}
-});
-}
-
-socket.on("signal", async msg=>{
-
-if(!pc) return;
-
-if(msg.offer){
-
-await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
-
-const answer = await pc.createAnswer();
-
-await pc.setLocalDescription(answer);
-
-socket.emit("signal",{
-room:room,
-data:{answer:answer}
-});
-
-log("Mengirim jawaban...");
-}
-
-if(msg.answer){
-
-await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-
-log("CONNECTED ✅");
-}
-
-if(msg.candidate){
-
-try{
-await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
-}catch(e){}
-}
-
-});
-
-window.onload = ()=>{
-const url = new URLSearchParams(location.search);
-const r = url.get("room");
-if(r){
-document.getElementById("room").value = r;
-}
-};
-
+    function copyToClipboard() {
+        const text = document.getElementById('resultArea').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Prompt berhasil disalin! Silakan paste di Gemini AI.");
+        });
+    }
 </script>
+
 </body>
 </html>
