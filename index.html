@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DKV Live Cam</title>
+<title>DKV LIVE PRO</title>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <style>
 body{
 margin:0;
 background:#000;
+font-family:Arial;
+overflow:hidden;
 color:white;
-font-family:arial;
-text-align:center;
 }
 video{
 width:100%;
@@ -20,32 +20,55 @@ height:100vh;
 object-fit:cover;
 background:black;
 }
-.box{
+.panel{
 position:fixed;
 top:20px;
 left:20px;
 z-index:10;
 background:rgba(0,0,0,.7);
 padding:15px;
-border-radius:10px;
+border-radius:12px;
+width:280px;
 }
 button,input{
-padding:10px;
-margin:5px;
+width:100%;
+padding:12px;
+margin:5px 0;
 font-size:18px;
+border:none;
+border-radius:8px;
+}
+button{
+background:#00cc66;
+color:white;
+font-weight:bold;
+}
+input{
+background:#222;
+color:white;
+}
+#status{
+margin-top:10px;
+font-size:15px;
+color:#00ff99;
 }
 </style>
 </head>
 
 <body>
 
-<div class="box" id="menu">
-<h2>DKV LIVE</h2>
+<div class="panel">
 
-<button onclick="startCam()">Kamera HP</button>
-<br>
-<input id="room" placeholder="ID Room">
-<button onclick="joinRoom()">Operator/vMix</button>
+<h2>DKV LIVE PRO</h2>
+
+<button onclick="jadiKamera()">📷 Kamera HP</button>
+
+<input id="room" placeholder="Masukkan ID Room">
+
+<button onclick="jadiOperator()">🎬 Operator vMix</button>
+
+<div id="status">READY</div>
+
 </div>
 
 <video id="video" autoplay playsinline muted></video>
@@ -54,27 +77,37 @@ font-size:18px;
 
 let peer;
 let localStream;
-let roomID="";
+let reconnect;
+const video = document.getElementById("video");
+const status = document.getElementById("status");
 
-const config = {
+const cfg = {
 iceServers:[
 {urls:"stun:stun.l.google.com:19302"},
-{urls:"stun:global.stun.twilio.com:3478"},
-{
-urls:"turn:openrelay.metered.ca:80",
-username:"openrelayproject",
-credential:"openrelayproject"
-}
+{urls:"stun:global.stun.twilio.com:3478"}
 ]
 };
 
-async function startCam(){
+function log(txt){
+status.innerText=txt;
+}
 
-roomID = Math.floor(Math.random()*9999).toString();
+async function jadiKamera(){
 
-alert("ID ROOM : "+roomID);
+try{
 
-peer = new Peer(roomID,{config});
+log("Mengaktifkan kamera...");
+
+let id = Math.floor(Math.random()*9999).toString();
+
+peer = new Peer("cam"+id,{config:cfg});
+
+peer.on("open",()=>{
+
+log("ID ROOM : "+id+" | Menunggu operator...");
+alert("ID ROOM = "+id);
+
+});
 
 localStream = await navigator.mediaDevices.getUserMedia({
 video:{
@@ -88,28 +121,47 @@ audio:true
 video.srcObject = localStream;
 
 peer.on("call",(call)=>{
+
+log("Operator terhubung...");
 call.answer(localStream);
+
 });
+
+}catch(e){
+log("Gagal buka kamera");
+}
 
 }
 
-function joinRoom(){
+function jadiOperator(){
 
-roomID=document.getElementById("room").value;
+let id=document.getElementById("room").value;
 
-peer = new Peer({config});
+if(!id) return alert("Masukkan ID");
+
+log("Menghubungkan...");
+
+peer = new Peer({config:cfg});
 
 peer.on("open",()=>{
 
-const call = peer.call(roomID,new MediaStream());
+const call = peer.call("cam"+id,new MediaStream());
 
 call.on("stream",(stream)=>{
+
 video.srcObject=stream;
 video.muted=false;
+log("CONNECTED ✅");
+
 });
 
 call.on("close",()=>{
-setTimeout(joinRoom,3000);
+log("Putus... reconnect...");
+setTimeout(jadiOperator,3000);
+});
+
+call.on("error",()=>{
+log("Gagal koneksi");
 });
 
 });
@@ -117,5 +169,6 @@ setTimeout(joinRoom,3000);
 }
 
 </script>
+
 </body>
 </html>
