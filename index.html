@@ -3,99 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LemonBooth Full Screen View</title>
+    <title>vMix Remote Cam</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { 
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden; 
-            background-color: #000; 
+        body, html { width: 100%; height: 100%; background: #111; color: white; font-family: sans-serif; }
+        
+        /* Menu Pilihan Utama */
+        #menu-utama {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; gap: 20px; padding: 20px; text-align: center;
         }
+        .btn-pilih {
+            width: 100%; max-width: 300px; padding: 20px; font-size: 18px; font-weight: bold;
+            border: none; border-radius: 10px; cursor: pointer; transition: 0.3s;
+        }
+        .btn-kameramen { background: #28a745; color: white; }
+        .btn-operator { background: #007bff; color: white; }
 
-        /* Video memenuhi seluruh layar tanpa tombol apapun */
-        #video {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            z-index: 1;
+        /* Area Kamera (Kameramen & Operator) */
+        #area-kerja { display: none; position: relative; height: 100vh; width: 100%; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        .overlay-status {
+            position: absolute; top: 0; left: 0; right: 0; padding: 15px;
+            background: rgba(0,0,0,0.8); text-align: center; z-index: 10;
         }
+        .id-box { font-size: 24px; color: #0f0; font-weight: bold; margin-top: 5px; letter-spacing: 2px; }
 
-        /* Dropdown kamera tetap ada namun dibuat semi-transparan di pojok */
-        /* Agar kamu tetap bisa pindah ke kamera belakang */
-        #cameraSelect {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.4);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 12px;
-            max-width: 150px;
-            outline: none;
+        /* Panel Input Operator */
+        #panel-operator {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; background: rgba(255,255,255,0.1);
+            padding: 20px; border-radius: 15px; backdrop-filter: blur(10px); z-index: 20;
         }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 5px; border: none; font-size: 18px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <select id="cameraSelect">
-        <option value="">Mencari Kamera...</option>
-    </select>
-    
-    <video id="video" autoplay playsinline></video>
+    <div id="menu-utama">
+        <h1>Remote Cam vMix</h1>
+        <p>Pilih peran kamu saat ini:</p>
+        <button class="btn-pilih btn-kameramen" onclick="mulaiKameramen()">SAYA KAMERAMEN</button>
+        <button class="btn-pilih btn-operator" onclick="mulaiOperator()">SAYA OPERATOR VMIX</button>
+    </div>
+
+    <div id="area-kerja">
+        <div class="overlay-status">
+            <div id="status-info">Inisialisasi...</div>
+            <div id="display-id" class="id-box">----</div>
+        </div>
+
+        <video id="video-display" autoplay playsinline muted></video>
+
+        <div id="panel-operator" style="display: none;">
+            <input type="text" id="input-id-hp" placeholder="KETIK ID HP DISINI">
+            <button class="btn-pilih btn-operator" style="padding: 10px;" onclick="hubungkanKeKameramen()">CONNECT TO CAMERA</button>
+        </div>
+    </div>
 
     <script>
-        const video = document.getElementById('video');
-        const cameraSelect = document.getElementById('cameraSelect');
-        let currentStream;
+        const menuUtama = document.getElementById('menu-utama');
+        const areaKerja = document.getElementById('area-kerja');
+        const videoElemen = document.getElementById('video-display');
+        const statusInfo = document.getElementById('status-info');
+        const displayId = document.getElementById('display-id');
+        const panelOperator = document.getElementById('panel-operator');
+        
+        let localStream;
+        let peer;
 
-        async function getDevices() {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        // FUNGSI KAMERAMEN
+        async function mulaiKameramen() {
+            menuUtama.style.display = 'none';
+            areaKerja.style.display = 'block';
+            statusInfo.innerText = "Membuka Kamera...";
+
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: 1280, height: 720 },
+                    audio: true
+                });
+                videoElemen.srcObject = localStream;
+                statusInfo.innerText = "Mencari ID di Server...";
+                
+                initPeerConnection(true); // true = sebagai kameramen
+            } catch (err) {
+                alert("Gagal buka kamera. Pastikan klik ALLOW!");
+                location.reload();
+            }
+        }
+
+        // FUNGSI OPERATOR
+        function mulaiOperator() {
+            menuUtama.style.display = 'none';
+            areaKerja.style.display = 'block';
+            panelOperator.style.display = 'block';
+            statusInfo.innerText = "Siap Menghubungkan";
+            displayId.innerText = "VMIX MODE";
             
-            cameraSelect.innerHTML = '';
-            videoDevices.forEach((device, i) => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.text = device.label || `Kamera ${i + 1}`;
-                cameraSelect.appendChild(option);
+            initPeerConnection(false);
+        }
+
+        // INISIALISASI PEERJS
+        function initPeerConnection(isKameramen) {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                if(isKameramen) {
+                    statusInfo.innerText = "KASIH ID INI KE OPERATOR:";
+                    displayId.innerText = id;
+                }
+            });
+
+            if(isKameramen) {
+                // Menunggu panggilan dari vMix
+                peer.on('call', (call) => {
+                    call.answer(localStream);
+                    statusInfo.innerText = "TERHUBUNG KE VMIX!";
+                });
+            }
+
+            peer.on('error', (err) => {
+                console.error(err);
+                statusInfo.innerText = "Error: " + err.type;
             });
         }
 
-        async function startCamera(deviceId) {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
+        // LOGIKA OPERATOR MEMANGGIL HP
+        function hubungkanKeKameramen() {
+            const targetId = document.getElementById('input-id-hp').value;
+            if(!targetId) return alert("Isi ID-nya dulu!");
 
-            const constraints = {
-                video: {
-                    deviceId: deviceId ? { exact: deviceId } : undefined,
-                    facingMode: deviceId ? undefined : "environment", // Prioritas kamera belakang
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                }
-            };
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                currentStream = stream;
-                video.srcObject = stream;
-                getDevices(); // Update label kamera setelah izin diberikan
-            } catch (err) {
-                console.error("Gagal akses kamera: ", err);
-            }
+            statusInfo.innerText = "Menghubungkan ke " + targetId + "...";
+            
+            // Operator memanggil HP (tanpa kirim video, hanya terima)
+            const call = peer.call(targetId, null); 
+            
+            call.on('stream', (remoteStream) => {
+                videoElemen.srcObject = remoteStream;
+                videoElemen.muted = false; // Agar suara dari HP terdengar di vMix
+                statusInfo.innerText = "LIVE DARI KAMERAMEN";
+                panelOperator.style.display = 'none';
+            });
         }
-
-        cameraSelect.onchange = () => {
-            startCamera(cameraSelect.value);
-        };
-
-        // Jalankan otomatis
-        startCamera();
     </script>
 </body>
 </html>
