@@ -3,114 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kameramen Mobile - vMix Connect</title>
+    <title>Kamera Mobile vMix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
         
-        /* Video Full Screen untuk Kameramen */
         #video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         
-        /* Overlay Status di Atas */
-        .status-bar {
+        .overlay {
             position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-            background: rgba(0,0,0,0.7); padding: 15px; text-align: center;
-            border-bottom: 2px solid #28a745;
+            background: rgba(0,0,0,0.6); padding: 15px; text-align: center;
         }
 
-        .id-text { font-size: 18px; font-weight: bold; color: #0f0; margin-top: 5px; }
-        .info { font-size: 11px; color: #ccc; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Panel vMix (Muncul di Laptop) */
-        .vmix-panel {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 20; background: rgba(0,0,0,0.8); padding: 15px;
-            border-radius: 10px; border: 1px solid #444; width: 90%; max-width: 350px;
-        }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: none; text-align: center; font-size: 16px; }
-        button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .status { font-size: 14px; margin-bottom: 10px; color: #0f0; }
+        input { padding: 8px; border-radius: 5px; border: none; width: 180px; margin-right: 5px; }
+        button { padding: 8px 15px; border-radius: 5px; border: none; background: #28a745; color: white; cursor: pointer; }
+        
+        #remoteVideo { position: absolute; width: 100%; height: 100%; object-fit: contain; z-index: 2; display: none; background: #000; }
+        .setup-box { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-    <div class="status-bar">
-        <div class="info">Status: <span id="peer-status">Connecting...</span></div>
-        <div id="display-id" class="id-text">SEDANG GENERATE ID...</div>
+    <div class="overlay">
+        <div id="my-id-display" class="status">Menghubungkan ke Server...</div>
+        
+        <div class="setup-box">
+            <p style="font-size: 12px; margin-bottom: 5px;">INPUT ID HP DISINI (Khusus vMix):</p>
+            <input type="text" id="remote-id" placeholder="Masukkan ID HP">
+            <button onclick="hubungkanKeHP()">TAMPILKAN</button>
+        </div>
     </div>
 
     <video id="video" autoplay playsinline muted></video>
-
-    <div class="vmix-panel" id="operator-panel">
-        <input type="text" id="target-id" placeholder="MASUKKAN ID DARI HP">
-        <button onclick="panggilKameramen()">HUBUNGKAN KE VMIX</button>
-    </div>
+    
+    <video id="remoteVideo" autoplay playsinline></video>
 
     <script>
         const videoElemen = document.getElementById('video');
-        const displayId = document.getElementById('display-id');
-        const statusText = document.getElementById('peer-status');
+        const remoteVideoElemen = document.getElementById('remoteVideo');
+        const idDisplay = document.getElementById('my-id-display');
         let localStream;
 
-        // 1. Inisialisasi Kamera
-        async function initCamera() {
+        // 1. Inisialisasi PeerJS
+        const peer = new Peer(); 
+
+        // Tampilkan ID unik HP ini
+        peer.on('open', (id) => {
+            idDisplay.innerText = "ID HP KAMU: " + id;
+        });
+
+        // 2. Aktifkan Kamera HP
+        async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: "environment", // Kamera Belakang
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: 1280, height: 720 },
                     audio: true
                 });
-                localStream = stream;
-                videoElemen.srcObject = stream;
-                console.log("Kamera Aktif");
-            } catch (e) {
-                alert("Izin Kamera Ditolak! Harap Izinkan Kamera agar ID Muncul.");
+                videoElemen.srcObject = localStream;
+            } catch (err) {
+                alert("Gagal akses kamera: " + err);
             }
         }
 
-        // 2. Inisialisasi Koneksi Peer
-        const peer = new Peer();
-
-        peer.on('open', (id) => {
-            statusText.innerText = "ONLINE";
-            displayId.innerText = id; // Menampilkan ID unik
-            console.log("ID Anda: " + id);
-        });
-
-        // Event saat ada panggilan masuk (dari Operator vMix)
+        // 3. Logika UNTUK HP: Menjawab panggilan dari vMix
         peer.on('call', (call) => {
-            console.log("Menerima panggilan dari vMix...");
-            call.answer(localStream); // Mengirim video ke vMix
-            
-            call.on('stream', (remoteStream) => {
-                // Video sudah terkirim!
-                statusText.innerText = "CONNECTED TO VMIX";
-            });
+            call.answer(localStream); // Kirim video HP ke vMix
+            console.log("Kamera sedang dikirim ke vMix...");
         });
 
-        // 3. Fungsi untuk Operator (dijalankan di browser laptop)
-        function panggilKameramen() {
-            const idKameramen = document.getElementById('target-id').value;
-            if (!idKameramen) return alert("Isi ID Kameramen dulu!");
+        // 4. Logika UNTUK vMix: Memanggil ID HP
+        function hubungkanKeHP() {
+            const idHP = document.getElementById('remote-id').value;
+            if (!idHP) return alert("Masukkan ID HP dulu!");
 
-            const call = peer.call(idKameramen, localStream);
+            const call = peer.call(idHP, localStream);
             call.on('stream', (remoteStream) => {
-                // Tampilkan video kameramen di layar laptop
-                videoElemen.srcObject = remoteStream;
-                statusText.innerText = "RECEIVING LIVE VIDEO";
-                document.getElementById('operator-panel').style.display = 'none';
+                // Sembunyikan view lokal, tampilkan view dari HP
+                videoElemen.style.display = 'none';
+                remoteVideoElemen.style.display = 'block';
+                remoteVideoElemen.srcObject = remoteStream;
+                idDisplay.innerText = "STATUS: TERHUBUNG KE VMIX";
             });
         }
 
-        peer.on('error', (err) => {
-            console.error(err);
-            statusText.innerText = "ERROR: " + err.type;
-        });
-
-        initCamera();
+        startCamera();
     </script>
 </body>
 </html>
