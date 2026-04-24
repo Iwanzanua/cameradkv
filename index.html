@@ -3,161 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DKV MUHLIBAT PRO</title>
+    <title>DKV MUHLIBAT - FIX</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; height: 100vh; }
+        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
         .hidden { display: none !important; }
-        
-        /* Full Screen Video */
-        #video-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; background: #000; }
+        #v-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         video { width: 100%; height: 100%; object-fit: cover; }
-
-        /* Floating Monitor */
-        #monitor { 
-            position: fixed; top: 10px; left: 10px; z-index: 100; 
-            background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; border-left: 4px solid #00ff88;
-            pointer-events: none;
-        }
-        .stat-val { font-family: monospace; color: #00ff88; font-size: 14px; font-weight: bold; }
-        .audio-label { font-size: 10px; margin-top: 5px; color: #aaa; }
-        .audio-bar { width: 120px; height: 4px; background: #333; margin-top: 2px; }
-        #audio-fill { height: 100%; width: 0%; background: #00ff88; transition: 0.1s; }
-
-        /* UI Overlays */
-        .overlay { 
-            position: relative; z-index: 50; background: rgba(20,20,20,0.9); 
-            padding: 30px; border-radius: 15px; width: 300px; 
-            margin: 80px auto; text-align: center; border: 1px solid #444;
-        }
-        .btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-stream { background: #00ff88; color: #000; }
-        .btn-op { background: #3498db; color: #fff; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 6px; background: #222; color: #fff; border: 1px solid #444; box-sizing: border-box; text-align: center; }
-        
-        #cam-controls { position: fixed; bottom: 20px; right: 20px; z-index: 100; }
-        .btn-circle { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.2); color: white; font-size: 10px; border: none; cursor: pointer; }
+        .ui { position: relative; z-index: 10; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; width: 280px; text-align: center; border: 1px solid #444; }
+        .btn { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-go { background: #00ff88; color: #000; }
+        .btn-link { background: #3498db; color: #fff; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; text-align: center; }
+        #info { position: fixed; top: 10px; left: 10px; z-index: 20; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 5px; font-size: 12px; }
     </style>
 </head>
 <body>
 
-<div id="monitor" class="hidden">
-    <div id="id-tag" style="font-size: 18px; margin-bottom: 5px;">ID: ----</div>
-    <div class="stat-val" id="stat-speed">SPEED: 0 kbps</div>
-    <div class="audio-label">AUDIO MONITOR</div>
-    <div class="audio-bar"><div id="audio-fill"></div></div>
+<div id="info">
+    <div id="stat">STATUS: OFFLINE</div>
+    <div id="spd" style="color: #00ff88;">SPEED: 0 kbps</div>
 </div>
 
-<div id="menu" class="overlay">
-    <h2 style="color: #00ff88;">DKV MUHLIBAT</h2>
-    <button class="btn btn-stream" onclick="startApp('cam')">MODE KAMERAMEN</button>
-    <button class="btn btn-op" onclick="startApp('op')">MODE OPERATOR</button>
+<div id="menu" class="ui">
+    <h3 style="margin-top:0">DKV CAM</h3>
+    <button class="btn btn-go" onclick="start('cam')">KAMERAMEN (HP)</button>
+    <button class="btn btn-link" onclick="start('op')">OPERATOR (vMix)</button>
 </div>
 
-<div id="ui-op" class="overlay hidden">
-    <h3>HUBUNGKAN KE VMIX</h3>
-    <input type="text" id="target-id" placeholder="Masukkan 4 Digit ID">
-    <button class="btn btn-op" id="btn-conn" onclick="connect()">CONNECT</button>
+<div id="ui-op" class="ui hidden">
+    <input type="text" id="target" placeholder="Masukkan ID">
+    <button class="btn btn-link" id="btn-c" onclick="connect()">HUBUNGKAN</button>
 </div>
 
-<div id="cam-controls" class="hidden">
-    <button id="btn-stream-toggle" class="btn btn-stream" onclick="toggleStream()">MULAI STREAM</button>
+<div id="cam-ctrl" style="position:fixed; bottom:20px; z-index:20;" class="hidden">
+    <button class="btn btn-go" onclick="toggleStream()" id="ts">MULAI STREAM</button>
 </div>
 
-<div id="video-container">
-    <video id="v-main" autoplay playsinline muted></video>
-</div>
+<div id="v-container"><video id="v" autoplay playsinline muted></video></div>
 
 <script>
-    let peer = null, localStream = null, lastBytes = 0, isStreaming = false;
-    const vMain = document.getElementById('v-main');
-    const ice = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    let peer = null, lStream = null, lastB = 0, isS = false;
+    const v = document.getElementById('v');
+    
+    // Server STUN cadangan lebih banyak agar tidak "Connecting" terus
+    const cfg = { iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
+    ]};
 
-    async function startApp(role) {
+    async function start(role) {
         document.getElementById('menu').classList.add('hidden');
-        document.getElementById('monitor').classList.remove('hidden');
-
         if(role === 'cam') {
             const id = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('id-tag').innerText = "ID: " + id;
-            document.getElementById('cam-controls').classList.remove('hidden');
-
-            peer = new Peer('dkv-' + id, { config: ice });
-            
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment", height: 720 }, audio: true 
-                });
-                vMain.srcObject = localStream;
-                localStream.getTracks().forEach(t => t.enabled = false); // Awal mati
-                startMonitor(null, localStream);
-            } catch(e) { alert("Wajib HTTPS!"); }
-
-            peer.on('call', call => {
-                call.answer(localStream);
-                startMonitor(call.peerConnection, localStream);
-            });
+            document.getElementById('stat').innerText = "ID: " + id;
+            document.getElementById('cam-ctrl').classList.remove('hidden');
+            peer = new Peer('dkv-' + id, { config: cfg });
+            lStream = await navigator.mediaDevices.getUserMedia({ video: {facingMode:"environment", height:720}, audio: true });
+            v.srcObject = lStream;
+            lStream.getTracks().forEach(t => t.enabled = false);
+            peer.on('call', c => { c.answer(lStream); monitor(c.peerConnection); });
         } else {
             document.getElementById('ui-op').classList.remove('hidden');
-            vMain.muted = false;
-            peer = new Peer({ config: ice });
+            v.muted = false;
+            peer = new Peer({ config: cfg });
         }
     }
 
     function toggleStream() {
-        isStreaming = !isStreaming;
-        localStream.getTracks().forEach(t => t.enabled = isStreaming);
-        const btn = document.getElementById('btn-stream-toggle');
-        btn.innerText = isStreaming ? "STOP STREAM" : "MULAI STREAM";
-        btn.style.background = isStreaming ? "#ff4444" : "#00ff88";
+        isS = !isS;
+        lStream.getTracks().forEach(t => t.enabled = isS);
+        const b = document.getElementById('ts');
+        b.innerText = isS ? "STOP STREAM" : "MULAI STREAM";
+        b.style.background = isS ? "#ff4444" : "#00ff88";
     }
 
     function connect() {
-        const tid = document.getElementById('target-id').value;
-        const call = peer.call('dkv-' + tid, new MediaStream());
-        document.getElementById('btn-conn').innerText = "Connecting...";
-        
-        call.on('stream', stream => {
-            vMain.srcObject = stream;
+        const id = document.getElementById('target').value;
+        const call = peer.call('dkv-' + id, new MediaStream());
+        document.getElementById('btn-c').innerText = "Connecting...";
+        call.on('stream', s => {
+            v.srcObject = s;
             document.getElementById('ui-op').classList.add('hidden');
-            startMonitor(call.peerConnection, stream);
+            document.getElementById('stat').innerText = "CONNECTED";
+            monitor(call.peerConnection);
         });
     }
 
-    function startMonitor(pc, stream) {
-        // Audio Bar
-        const aCtx = new AudioContext();
-        const src = aCtx.createMediaStreamSource(stream);
-        const ana = aCtx.createAnalyser();
-        src.connect(ana);
-        const data = new Uint8Array(ana.frequencyBinCount);
-        
-        function draw() {
-            ana.getByteFrequencyData(data);
-            let avg = data.reduce((a,b) => a+b) / data.length;
-            document.getElementById('audio-fill').style.width = Math.min(avg * 3, 100) + "%";
-            requestAnimationFrame(draw);
-        }
-        draw();
-
-        // Speed/Bitrate (Fixing Speed 0)
-        if(pc) {
-            setInterval(async () => {
-                const stats = await pc.getStats();
-                stats.forEach(report => {
-                    if (report.type === 'inbound-rtp' || report.type === 'outbound-rtp') {
-                        if (report.kind === 'video') {
-                            const bytes = report.bytesReceived || report.bytesSent;
-                            if (lastBytes > 0) {
-                                const speed = Math.floor((bytes - lastBytes) * 8 / 1000);
-                                document.getElementById('stat-speed').innerText = `SPEED: ${speed} kbps`;
-                            }
-                            lastBytes = bytes;
-                        }
+    function monitor(pc) {
+        if(!pc) return;
+        setInterval(async () => {
+            const stats = await pc.getStats();
+            stats.forEach(r => {
+                if (r.type === 'inbound-rtp' || r.type === 'outbound-rtp') {
+                    if (r.kind === 'video') {
+                        const b = r.bytesReceived || r.bytesSent;
+                        const s = Math.floor((b - lastB) * 8 / 1000);
+                        if(lastB > 0) document.getElementById('spd').innerText = `SPEED: ${s} kbps`;
+                        lastB = b;
                     }
-                });
-            }, 1000);
-        }
+                }
+            });
+        }, 1000);
     }
 </script>
 </body>
