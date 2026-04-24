@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .gradient-bg { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+        #imagePreview { max-width: 100%; height: auto; border-radius: 8px; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans">
@@ -20,36 +21,39 @@
 
             <div class="p-6 space-y-6">
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Upload Gambar Pendukung (Gedung/Siswa):</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">1. Upload Foto Utama (Akan jadi bagian dari poster):</label>
                     <input type="file" id="imageInput" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                     <div id="previewContainer" class="mt-4 hidden">
-                        <img id="imagePreview" src="#" alt="Preview" class="rounded-lg max-h-48 mx-auto shadow">
+                        <p class="text-xs text-gray-500 mb-2">Preview Foto yang akan diproses AI:</p>
+                        <img id="imagePreview" src="#" alt="Preview">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Tema Poster:</label>
-                    <input type="text" id="themeInput" placeholder="Contoh: Digital Masa Depan, Modern Minimalist..." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">2. Deskripsikan Apa yang Terjadi di Foto Tersebut:</label>
+                    <textarea id="themeInput" rows="3" placeholder="Contoh: Seorang siswa DKV sedang memegang kamera film di depan komputer editing..." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Jumlah Varian Referensi:</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">3. Jumlah Varian Referensi:</label>
                     <select id="countInput" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                         <option value="1">1 Poster</option>
-                        <option value="3">3 Poster (Rekomendasi)</option>
+                        <option value="3" selected>3 Poster (Rekomendasi)</option>
                         <option value="5">5 Poster</option>
                     </select>
                 </div>
 
                 <button onclick="generatePrompt()" class="w-full gradient-bg text-white font-bold py-3 rounded-lg hover:opacity-90 transition shadow-md">
-                    Buat Prompt Poster
+                    Buat Prompt & Deskripsi Poster
                 </button>
 
                 <div id="resultSection" class="hidden space-y-4">
                     <hr>
-                    <h2 class="text-lg font-bold text-gray-800">Hasil Prompt Untuk AI:</h2>
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-gray-800">Prompt Untuk AI Gambar:</h2>
+                        <button onclick="copyToClipboard()" class="text-sm text-blue-600 hover:underline">Salin Semua</button>
+                    </div>
                     <div id="promptOutput" class="space-y-4"></div>
-                    <button onclick="copyToClipboard()" class="text-sm text-blue-600 hover:underline">Salin Semua Prompt</button>
                 </div>
             </div>
         </div>
@@ -66,7 +70,7 @@
         }
 
         function generatePrompt() {
-            const theme = document.getElementById('themeInput').value || "Modern dan Professional";
+            const context = document.getElementById('themeInput').value || "Siswa sedang berkegiatan praktik";
             const count = parseInt(document.getElementById('countInput').value);
             const outputArea = document.getElementById('promptOutput');
             const resultSection = document.getElementById('resultSection');
@@ -74,20 +78,21 @@
             outputArea.innerHTML = '';
             resultSection.classList.remove('hidden');
 
-            const baseDesc = "Poster pendidikan untuk SMK Muhammadiyah 5 Babat (SMK Muhlibat). Sekolah ini adalah Pusat Keunggulan (Center of Excellence) dan Terakreditasi A. ";
+            const schoolInfo = "SMK Muhammadiyah 5 Babat (SMK Muhlibat), Sekolah Pusat Keunggulan, Terakreditasi A.";
             
             const styles = [
-                "Cinematic lighting, high resolution, 8k, clean layout, typography bold.",
-                "Minimalist vector style, flat design, vibrant corporate colors.",
-                "Futuristic tech style, neon blue accents, 3D elements, hyper-realistic.",
-                "Soft focus background, focus on happy students, professional photography style.",
-                "Dynamic composition, motion blur effects, youthful and energetic vibe."
+                "Cinematic lighting, high resolution, 8k, professional photography style, clean layout.",
+                "Modern digital design, tech-inspired overlays, vibrant corporate blue and gold accents.",
+                "Futuristic classroom aesthetic, subtle motion blur, sharp focus on the subject.",
+                "Clean minimalist composition, bold typography, soft bokeh background.",
+                "Energetic youth vibe, dynamic angles, high contrast, studio lighting."
             ];
 
             for (let i = 0; i < count; i++) {
-                let prompt = `[POSTER REFERENSI ${i+1}]\n`;
-                prompt += `Visual: ${baseDesc} Tema: ${theme}. Sertakan teks utama 'SMK Muhammadiyah 5 Babat' dan slogan 'Sekolah Pusat Keunggulan'. `;
-                prompt += `Detail: Gunakan elemen desain yang melambangkan kemajuan teknologi dan pendidikan Islam modern. `;
+                let prompt = `[PROMPT POSTER REFERENSI ${i+1}]\n`;
+                prompt += `Integrasikan foto yang diunggah (deskripsi: ${context}) ke dalam sebuah poster profesional untuk ${schoolInfo}\n\n`;
+                prompt += `Elemen Wajib: Teks utama 'SMK Muhammadiyah 5 Babat', logo sekolah, dan slogan 'Sekolah Pusat Keunggulan'.\n`;
+                prompt += `Deskripsi Visual: Jadikan subjek dalam foto sebagai titik fokus utama. Tambahkan elemen grafis modern yang melambangkan kemajuan teknologi dan pendidikan Islam modern.\n`;
                 prompt += `Style: ${styles[i % styles.length]}`;
 
                 const div = document.createElement('div');
@@ -100,7 +105,7 @@
         function copyToClipboard() {
             const prompts = document.getElementById('promptOutput').innerText;
             navigator.clipboard.writeText(prompts);
-            alert("Prompt berhasil disalin!");
+            alert("Prompt berhasil disalin! Silakan tempelkan ke AI Generator.");
         }
     </script>
 </body>
