@@ -1,94 +1,121 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kamera Mobile vMix</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        
-        #video { position: absolute; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        
-        .overlay {
-            position: absolute; top: 0; left: 0; right: 0; z-index: 10;
-            background: rgba(0,0,0,0.6); padding: 15px; text-align: center;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DKV Live Cam</title>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-        .status { font-size: 14px; margin-bottom: 10px; color: #0f0; }
-        input { padding: 8px; border-radius: 5px; border: none; width: 180px; margin-right: 5px; }
-        button { padding: 8px 15px; border-radius: 5px; border: none; background: #28a745; color: white; cursor: pointer; }
-        
-        #remoteVideo { position: absolute; width: 100%; height: 100%; object-fit: contain; z-index: 2; display: none; background: #000; }
-        .setup-box { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; }
-    </style>
+<style>
+body{
+margin:0;
+background:#000;
+color:white;
+font-family:arial;
+text-align:center;
+}
+video{
+width:100%;
+height:100vh;
+object-fit:cover;
+background:black;
+}
+.box{
+position:fixed;
+top:20px;
+left:20px;
+z-index:10;
+background:rgba(0,0,0,.7);
+padding:15px;
+border-radius:10px;
+}
+button,input{
+padding:10px;
+margin:5px;
+font-size:18px;
+}
+</style>
 </head>
+
 <body>
 
-    <div class="overlay">
-        <div id="my-id-display" class="status">Menghubungkan ke Server...</div>
-        
-        <div class="setup-box">
-            <p style="font-size: 12px; margin-bottom: 5px;">INPUT ID HP DISINI (Khusus vMix):</p>
-            <input type="text" id="remote-id" placeholder="Masukkan ID HP">
-            <button onclick="hubungkanKeHP()">TAMPILKAN</button>
-        </div>
-    </div>
+<div class="box" id="menu">
+<h2>DKV LIVE</h2>
 
-    <video id="video" autoplay playsinline muted></video>
-    
-    <video id="remoteVideo" autoplay playsinline></video>
+<button onclick="startCam()">Kamera HP</button>
+<br>
+<input id="room" placeholder="ID Room">
+<button onclick="joinRoom()">Operator/vMix</button>
+</div>
 
-    <script>
-        const videoElemen = document.getElementById('video');
-        const remoteVideoElemen = document.getElementById('remoteVideo');
-        const idDisplay = document.getElementById('my-id-display');
-        let localStream;
+<video id="video" autoplay playsinline muted></video>
 
-        // 1. Inisialisasi PeerJS
-        const peer = new Peer(); 
+<script>
 
-        // Tampilkan ID unik HP ini
-        peer.on('open', (id) => {
-            idDisplay.innerText = "ID HP KAMU: " + id;
-        });
+let peer;
+let localStream;
+let roomID="";
 
-        // 2. Aktifkan Kamera HP
-        async function startCamera() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: 1280, height: 720 },
-                    audio: true
-                });
-                videoElemen.srcObject = localStream;
-            } catch (err) {
-                alert("Gagal akses kamera: " + err);
-            }
-        }
+const config = {
+iceServers:[
+{urls:"stun:stun.l.google.com:19302"},
+{urls:"stun:global.stun.twilio.com:3478"},
+{
+urls:"turn:openrelay.metered.ca:80",
+username:"openrelayproject",
+credential:"openrelayproject"
+}
+]
+};
 
-        // 3. Logika UNTUK HP: Menjawab panggilan dari vMix
-        peer.on('call', (call) => {
-            call.answer(localStream); // Kirim video HP ke vMix
-            console.log("Kamera sedang dikirim ke vMix...");
-        });
+async function startCam(){
 
-        // 4. Logika UNTUK vMix: Memanggil ID HP
-        function hubungkanKeHP() {
-            const idHP = document.getElementById('remote-id').value;
-            if (!idHP) return alert("Masukkan ID HP dulu!");
+roomID = Math.floor(Math.random()*9999).toString();
 
-            const call = peer.call(idHP, localStream);
-            call.on('stream', (remoteStream) => {
-                // Sembunyikan view lokal, tampilkan view dari HP
-                videoElemen.style.display = 'none';
-                remoteVideoElemen.style.display = 'block';
-                remoteVideoElemen.srcObject = remoteStream;
-                idDisplay.innerText = "STATUS: TERHUBUNG KE VMIX";
-            });
-        }
+alert("ID ROOM : "+roomID);
 
-        startCamera();
-    </script>
+peer = new Peer(roomID,{config});
+
+localStream = await navigator.mediaDevices.getUserMedia({
+video:{
+facingMode:"environment",
+width:1280,
+height:720
+},
+audio:true
+});
+
+video.srcObject = localStream;
+
+peer.on("call",(call)=>{
+call.answer(localStream);
+});
+
+}
+
+function joinRoom(){
+
+roomID=document.getElementById("room").value;
+
+peer = new Peer({config});
+
+peer.on("open",()=>{
+
+const call = peer.call(roomID,new MediaStream());
+
+call.on("stream",(stream)=>{
+video.srcObject=stream;
+video.muted=false;
+});
+
+call.on("close",()=>{
+setTimeout(joinRoom,3000);
+});
+
+});
+
+}
+
+</script>
 </body>
 </html>
