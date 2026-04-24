@@ -3,112 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DKV MUHLIBAT - FIX</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>LemonBooth Full Screen View</title>
     <style>
-        body { font-family: sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .hidden { display: none !important; }
-        #v-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .ui { position: relative; z-index: 10; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; width: 280px; text-align: center; border: 1px solid #444; }
-        .btn { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .btn-go { background: #00ff88; color: #000; }
-        .btn-link { background: #3498db; color: #fff; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #555; background: #222; color: #fff; box-sizing: border-box; text-align: center; }
-        #info { position: fixed; top: 10px; left: 10px; z-index: 20; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 5px; font-size: 12px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            background-color: #000; 
+        }
+
+        /* Video memenuhi seluruh layar tanpa tombol apapun */
+        #video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* Dropdown kamera tetap ada namun dibuat semi-transparan di pojok */
+        /* Agar kamu tetap bisa pindah ke kamera belakang */
+        #cameraSelect {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.4);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 150px;
+            outline: none;
+        }
     </style>
 </head>
 <body>
 
-<div id="info">
-    <div id="stat">STATUS: OFFLINE</div>
-    <div id="spd" style="color: #00ff88;">SPEED: 0 kbps</div>
-</div>
-
-<div id="menu" class="ui">
-    <h3 style="margin-top:0">DKV CAM</h3>
-    <button class="btn btn-go" onclick="start('cam')">KAMERAMEN (HP)</button>
-    <button class="btn btn-link" onclick="start('op')">OPERATOR (vMix)</button>
-</div>
-
-<div id="ui-op" class="ui hidden">
-    <input type="text" id="target" placeholder="Masukkan ID">
-    <button class="btn btn-link" id="btn-c" onclick="connect()">HUBUNGKAN</button>
-</div>
-
-<div id="cam-ctrl" style="position:fixed; bottom:20px; z-index:20;" class="hidden">
-    <button class="btn btn-go" onclick="toggleStream()" id="ts">MULAI STREAM</button>
-</div>
-
-<div id="v-container"><video id="v" autoplay playsinline muted></video></div>
-
-<script>
-    let peer = null, lStream = null, lastB = 0, isS = false;
-    const v = document.getElementById('v');
+    <select id="cameraSelect">
+        <option value="">Mencari Kamera...</option>
+    </select>
     
-    // Server STUN cadangan lebih banyak agar tidak "Connecting" terus
-    const cfg = { iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' }
-    ]};
+    <video id="video" autoplay playsinline></video>
 
-    async function start(role) {
-        document.getElementById('menu').classList.add('hidden');
-        if(role === 'cam') {
-            const id = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('stat').innerText = "ID: " + id;
-            document.getElementById('cam-ctrl').classList.remove('hidden');
-            peer = new Peer('dkv-' + id, { config: cfg });
-            lStream = await navigator.mediaDevices.getUserMedia({ video: {facingMode:"environment", height:720}, audio: true });
-            v.srcObject = lStream;
-            lStream.getTracks().forEach(t => t.enabled = false);
-            peer.on('call', c => { c.answer(lStream); monitor(c.peerConnection); });
-        } else {
-            document.getElementById('ui-op').classList.remove('hidden');
-            v.muted = false;
-            peer = new Peer({ config: cfg });
-        }
-    }
+    <script>
+        const video = document.getElementById('video');
+        const cameraSelect = document.getElementById('cameraSelect');
+        let currentStream;
 
-    function toggleStream() {
-        isS = !isS;
-        lStream.getTracks().forEach(t => t.enabled = isS);
-        const b = document.getElementById('ts');
-        b.innerText = isS ? "STOP STREAM" : "MULAI STREAM";
-        b.style.background = isS ? "#ff4444" : "#00ff88";
-    }
-
-    function connect() {
-        const id = document.getElementById('target').value;
-        const call = peer.call('dkv-' + id, new MediaStream());
-        document.getElementById('btn-c').innerText = "Connecting...";
-        call.on('stream', s => {
-            v.srcObject = s;
-            document.getElementById('ui-op').classList.add('hidden');
-            document.getElementById('stat').innerText = "CONNECTED";
-            monitor(call.peerConnection);
-        });
-    }
-
-    function monitor(pc) {
-        if(!pc) return;
-        setInterval(async () => {
-            const stats = await pc.getStats();
-            stats.forEach(r => {
-                if (r.type === 'inbound-rtp' || r.type === 'outbound-rtp') {
-                    if (r.kind === 'video') {
-                        const b = r.bytesReceived || r.bytesSent;
-                        const s = Math.floor((b - lastB) * 8 / 1000);
-                        if(lastB > 0) document.getElementById('spd').innerText = `SPEED: ${s} kbps`;
-                        lastB = b;
-                    }
-                }
+        async function getDevices() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            cameraSelect.innerHTML = '';
+            videoDevices.forEach((device, i) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Kamera ${i + 1}`;
+                cameraSelect.appendChild(option);
             });
-        }, 1000);
-    }
-</script>
+        }
+
+        async function startCamera(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: {
+                    deviceId: deviceId ? { exact: deviceId } : undefined,
+                    facingMode: deviceId ? undefined : "environment", // Prioritas kamera belakang
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                video.srcObject = stream;
+                getDevices(); // Update label kamera setelah izin diberikan
+            } catch (err) {
+                console.error("Gagal akses kamera: ", err);
+            }
+        }
+
+        cameraSelect.onchange = () => {
+            startCamera(cameraSelect.value);
+        };
+
+        // Jalankan otomatis
+        startCamera();
+    </script>
 </body>
 </html>
