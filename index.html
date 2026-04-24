@@ -1,73 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DKV LIVE PRO</title>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DKV LIVE LINK</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
 body{
 margin:0;
-background:#000;
 font-family:Arial;
-overflow:hidden;
-color:white;
+background:#000;
+color:#fff;
+text-align:center;
 }
 video{
 width:100%;
 height:100vh;
 object-fit:cover;
-background:black;
+background:#000;
 }
 .panel{
 position:fixed;
 top:20px;
 left:20px;
 z-index:10;
-background:rgba(0,0,0,.7);
+background:rgba(0,0,0,.75);
 padding:15px;
 border-radius:12px;
-width:280px;
+width:320px;
 }
-button,input{
+input,button{
 width:100%;
 padding:12px;
 margin:5px 0;
-font-size:18px;
+font-size:17px;
 border:none;
 border-radius:8px;
+box-sizing:border-box;
 }
-button{
-background:#00cc66;
-color:white;
-font-weight:bold;
-}
-input{
-background:#222;
-color:white;
-}
-#status{
-margin-top:10px;
-font-size:15px;
-color:#00ff99;
-}
+input{background:#222;color:#fff;}
+button{background:#00c853;color:#fff;font-weight:bold;cursor:pointer;}
+#status{margin-top:10px;color:#00ff99;font-size:14px;}
+.small{font-size:12px;color:#ccc;word-break:break-all;}
 </style>
 </head>
-
 <body>
 
 <div class="panel">
 
 <h2>DKV LIVE PRO</h2>
 
-<button onclick="jadiKamera()">📷 Kamera HP</button>
+<button onclick="startCam()">📷 Kamera HP</button>
 
-<input id="room" placeholder="Masukkan ID Room">
+<input id="room" placeholder="Masukkan kode room">
 
-<button onclick="jadiOperator()">🎬 Operator vMix</button>
+<button onclick="joinRoom()">🎬 Operator / vMix</button>
 
 <div id="status">READY</div>
+<div class="small" id="linkbox"></div>
 
 </div>
 
@@ -75,39 +65,61 @@ color:#00ff99;
 
 <script>
 
-let peer;
-let localStream;
-let reconnect;
-const video = document.getElementById("video");
-const status = document.getElementById("status");
+const SIGNAL_SERVER = "https://yourdomain.com"; // ganti domain server nodejs
+const socket = io(SIGNAL_SERVER,{transports:["websocket"]});
 
-const cfg = {
+const video = document.getElementById("video");
+const statusBox = document.getElementById("status");
+const linkbox = document.getElementById("linkbox");
+
+let pc;
+let localStream;
+let room = "";
+
+const config = {
 iceServers:[
 {urls:"stun:stun.l.google.com:19302"},
-{urls:"stun:global.stun.twilio.com:3478"}
+{
+urls:"turn:openrelay.metered.ca:80",
+username:"openrelayproject",
+credential:"openrelayproject"
+}
 ]
 };
 
 function log(txt){
-status.innerText=txt;
+statusBox.innerText = txt;
 }
 
-async function jadiKamera(){
+function newPeer(){
+pc = new RTCPeerConnection(config);
 
-try{
-
-log("Mengaktifkan kamera...");
-
-let id = Math.floor(Math.random()*9999).toString();
-
-peer = new Peer("cam"+id,{config:cfg});
-
-peer.on("open",()=>{
-
-log("ID ROOM : "+id+" | Menunggu operator...");
-alert("ID ROOM = "+id);
-
+pc.onicecandidate = e=>{
+if(e.candidate){
+socket.emit("signal",{
+room:room,
+data:{candidate:e.candidate}
 });
+}
+};
+
+pc.ontrack = e=>{
+video.srcObject = e.streams[0];
+video.muted = false;
+};
+
+pc.onconnectionstatechange = ()=>{
+log("STATUS : " + pc.connectionState);
+};
+}
+
+async function startCam(){
+
+room = Math.floor(1000 + Math.random()*9000).toString();
+
+newPeer();
+
+log("Aktifkan kamera...");
 
 localStream = await navigator.mediaDevices.getUserMedia({
 video:{
@@ -120,55 +132,89 @@ audio:true
 
 video.srcObject = localStream;
 
-peer.on("call",(call)=>{
-
-log("Operator terhubung...");
-call.answer(localStream);
-
+localStream.getTracks().forEach(track=>{
+pc.addTrack(track,localStream);
 });
 
-}catch(e){
-log("Gagal buka kamera");
+socket.emit("join",room);
+
+const link = location.origin + location.pathname + "?room=" + room;
+
+linkbox.innerHTML =
+"ROOM : "+room+"<br><br>" +
+"LINK COPY:<br>"+link;
+
+log("Menunggu operator...");
 }
 
+async function joinRoom(){
+
+room = document.getElementById("room").value.trim();
+
+if(!room){
+alert("Masukkan kode room");
+return;
 }
 
-function jadiOperator(){
+newPeer();
 
-let id=document.getElementById("room").value;
-
-if(!id) return alert("Masukkan ID");
+socket.emit("join",room);
 
 log("Menghubungkan...");
 
-peer = new Peer({config:cfg});
+const offer = await pc.createOffer();
+await pc.setLocalDescription(offer);
 
-peer.on("open",()=>{
-
-const call = peer.call("cam"+id,new MediaStream());
-
-call.on("stream",(stream)=>{
-
-video.srcObject=stream;
-video.muted=false;
-log("CONNECTED ✅");
-
+socket.emit("signal",{
+room:room,
+data:{offer:offer}
 });
-
-call.on("close",()=>{
-log("Putus... reconnect...");
-setTimeout(jadiOperator,3000);
-});
-
-call.on("error",()=>{
-log("Gagal koneksi");
-});
-
-});
-
 }
 
-</script>
+socket.on("signal", async msg=>{
 
+if(!pc) return;
+
+if(msg.offer){
+
+await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
+
+const answer = await pc.createAnswer();
+
+await pc.setLocalDescription(answer);
+
+socket.emit("signal",{
+room:room,
+data:{answer:answer}
+});
+
+log("Mengirim jawaban...");
+}
+
+if(msg.answer){
+
+await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+
+log("CONNECTED ✅");
+}
+
+if(msg.candidate){
+
+try{
+await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+}catch(e){}
+}
+
+});
+
+window.onload = ()=>{
+const url = new URLSearchParams(location.search);
+const r = url.get("room");
+if(r){
+document.getElementById("room").value = r;
+}
+};
+
+</script>
 </body>
 </html>
